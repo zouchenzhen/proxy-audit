@@ -1,0 +1,31 @@
+# Local credentials and environment
+config.local.json
+.env
+.env.*
+!.env.example
+
+# Node sources, databases, generated configs, logs, and reports
+input/
+results/
+temp/
+*.db
+*.sqlite
+*.sqlite3
+
+# Downloaded runtime binaries
+bin/*.exe
+bin/*.dll
+bin/*.zip
+bin/_extract/
+
+# Python/editor artifacts
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.idea/
+.vscode/
+
+# OS artifacts
+Thumbs.db
+.DS_Store
