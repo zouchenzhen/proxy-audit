@@ -3,5 +3,10 @@
   "ipinfo_api_key": "",
   "ipqs_api_key": "",
   "scamalytics_user": "",
-  "scamalytics_api_key": ""
+  "scamalytics_api_key": "",
+  "abuseipdb_api_key": "",
+  "singbox_path": "",
+  "xray_path": "",
+  "default_timeout": 15,
+  "default_concurrency": 2
 }

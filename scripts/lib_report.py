@@ -32,9 +32,13 @@ def build_summary_rows(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         ip2location = (((item.get('result') or {}).get('ip2location')) or {})
         ipqs = (((item.get('result') or {}).get('ipqs')) or {})
         unified = (((item.get('result') or {}).get('unified')) or {})
+        quality = (((item.get('result') or {}).get('quality')) or {})
+        services = (((item.get('result') or {}).get('services')) or {})
+        abuse = (((item.get('result') or {}).get('abuseipdb')) or {})
         rows.append({
             'remark': node.get('remark'),
             'protocol': node.get('protocol'),
+            'kernel': item.get('kernel'),
             'source_type': node.get('source_type'),
             'source_name': node.get('source_name'),
             'subscription_name': node.get('subscription_name'),
@@ -78,12 +82,22 @@ def build_summary_rows(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             'ipqs_vpn': ipqs.get('vpn'),
             'ipqs_tor': ipqs.get('tor'),
             'ipqs_mobile': ipqs.get('mobile'),
+            'abuse_confidence_score': abuse.get('abuseConfidenceScore'),
             'ip_type_final': unified.get('ip_type_final'),
             'risk_score_final': unified.get('risk_score_final'),
             'risk_level_final': unified.get('risk_level_final'),
             'native_ip_judgement': unified.get('native_ip_judgement'),
             'civilian_grade': unified.get('civilian_grade'),
             'reasoning_brief': unified.get('reasoning_brief'),
+            'core_startup_ms': item.get('core_startup_ms'),
+            'ipify_latency_ms': ((item.get('result') or {}).get('ipify_latency_ms')),
+            'latency_median_ms': quality.get('latency_median_ms'),
+            'jitter_ms': quality.get('jitter_ms'),
+            'probe_success_rate': quality.get('success_rate'),
+            'chatgpt_reachable': (services.get('chatgpt') or {}).get('reachable'),
+            'claude_reachable': (services.get('claude') or {}).get('reachable'),
+            'github_reachable': (services.get('github') or {}).get('reachable'),
+            'youtube_reachable': (services.get('youtube') or {}).get('reachable'),
             'socks_port': item.get('socks_port'),
             'config_path': item.get('config_path'),
             'log_path': item.get('log_path'),

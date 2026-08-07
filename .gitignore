@@ -1,5 +1,8 @@
 # Local credentials and environment
 config.local.json
+config.secure.json
+config.secure.tmp
+config.tmp
 .env
 .env.*
 !.env.example
@@ -25,6 +28,7 @@ __pycache__/
 venv/
 .idea/
 .vscode/
+.pytest_cache/
 
 # OS artifacts
 Thumbs.db

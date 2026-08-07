@@ -9,12 +9,7 @@ from lib_report import write_csv, build_summary_rows, write_markdown_report
 from lib_singbox import ensure_runtime_dirs, build_singbox_config, write_config_file, start_singbox, stop_singbox, wait_port
 from lib_v2rayn import load_from_v2ray_backup, load_from_v2ray_db, load_from_input_file, filter_nodes, describe_support
 
-ROOT = Path(r'E:\Openclaw_Workspace\proxy_audit')
-RESULT_RAW = ROOT / 'results' / 'raw'
-RESULT_CSV = ROOT / 'results' / 'csv'
-RESULT_REPORT = ROOT / 'results' / 'reports'
-CONFIG_DIR = ROOT / 'temp' / 'configs'
-LOG_DIR = ROOT / 'temp' / 'logs'
+from lib_paths import ROOT, RESULT_RAW, RESULT_CSV, RESULT_REPORT, CONFIG_DIR, LOG_DIR
 
 
 def parse_args():

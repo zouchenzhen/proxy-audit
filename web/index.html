@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>ProxyScope · 节点 IP 质量审计</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="noise"></div>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark"><span></span><span></span><span></span></div>
+      <div><strong>ProxyScope</strong><small>NODE INTELLIGENCE CONSOLE</small></div>
+    </div>
+    <div class="top-actions">
+      <div class="health-pill"><i id="healthDot"></i><span id="healthText">连接本地引擎…</span></div>
+      <button class="icon-button" id="settingsButton" title="服务商与内核设置" aria-label="打开设置">
+        <svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.55V21h-4v-.08A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1.03H3v-4h.08A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 10 3.02V3h4v.08a1.7 1.7 0 0 0 1.03 1.52 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 7l-.06.06a1.7 1.7 0 0 0-.34 1.88c.25.62.86 1.03 1.55 1.03H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="app-shell">
+    <aside class="control-rail">
+      <section class="workflow-step active" data-step="1">
+        <div class="step-heading"><span class="step-index">01</span><div><h2>导入节点</h2><p>链接、订阅或 v2rayN 备份</p></div></div>
+        <div class="tabs" id="importTabs">
+          <button class="active" data-tab="paste">粘贴</button>
+          <button data-tab="file">文件</button>
+          <button data-tab="url">订阅 URL</button>
+        </div>
+        <div class="tab-panel active" data-panel="paste">
+          <textarea id="nodeText" rows="6" spellcheck="false" placeholder="每行一个节点链接，也支持 Base64 订阅正文"></textarea>
+        </div>
+        <div class="tab-panel" data-panel="file">
+          <label class="drop-zone" id="dropZone">
+            <input type="file" id="nodeFile" accept=".txt,.zip,.db,.sqlite,.sqlite3">
+            <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 15v4h14v-4"/></svg>
+            <strong id="fileLabel">选择或拖入文件</strong>
+            <small>TXT / ZIP / guiNDB.db · 最大 64 MB</small>
+          </label>
+        </div>
+        <div class="tab-panel" data-panel="url">
+          <input id="subscriptionUrl" type="url" placeholder="https://example.com/subscription">
+          <p class="field-hint">订阅只在本机后端读取，不会上传到其他服务器。</p>
+        </div>
+        <button class="secondary wide" id="importButton"><span>解析并预览</span><kbd>↵</kbd></button>
+        <div class="import-summary hidden" id="importSummary"></div>
+      </section>
+
+      <section class="workflow-step" data-step="2">
+        <div class="step-heading"><span class="step-index">02</span><div><h2>检测策略</h2><p>选择内核、并发与情报源</p></div></div>
+        <label class="field-label">检测内核</label>
+        <div class="kernel-grid" id="kernelGrid"><div class="skeleton-card"></div><div class="skeleton-card"></div></div>
+        <div class="two-col">
+          <label><span>并发节点</span><input id="concurrency" type="number" min="1" max="8" value="2"></label>
+          <label><span>单源超时 / 秒</span><input id="timeout" type="number" min="4" max="90" value="15"></label>
+        </div>
+        <label class="field-label">IP 情报源 <button class="text-button" id="selectDefaultProviders">恢复默认</button></label>
+        <div class="provider-list" id="providerList"></div>
+        <details class="optional-block">
+          <summary>可选网络探测 <span>默认精简</span></summary>
+          <label class="switch-line"><input type="checkbox" id="qualityProbe" checked><i></i><span>延迟与抖动采样（2 次）</span></label>
+          <div id="serviceList" class="service-list"></div>
+          <p>服务探测只验证端点可达，不等于账号或地区解锁。</p>
+        </details>
+        <div class="advanced-filter">
+          <input id="preFilter" placeholder="运行前按备注/服务器筛选">
+          <input id="nodeLimit" type="number" min="0" placeholder="节点上限（0=全部）">
+        </div>
+      </section>
+
+      <div class="run-dock">
+        <button class="primary wide" id="startButton" disabled>
+          <span class="button-glow"></span><strong>开始批量检测</strong><small id="startHint">请先导入节点</small>
+        </button>
+        <button class="danger subtle wide hidden" id="cancelButton">取消当前任务</button>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <section class="overview-grid">
+        <article class="metric-card accent"><span>已导入</span><strong id="metricImported">—</strong><small id="metricProtocols">等待节点</small></article>
+        <article class="metric-card"><span>检测成功</span><strong id="metricSuccess">—</strong><small id="metricSuccessRate">尚未运行</small></article>
+        <article class="metric-card"><span>低风险出口</span><strong id="metricLowRisk">—</strong><small>基于已启用情报源</small></article>
+        <article class="metric-card"><span>住宅 / 移动</span><strong id="metricCivilian">—</strong><small>并非“原生 IP”的同义词</small></article>
+      </section>
+
+      <section class="task-strip" id="taskStrip">
+        <div class="task-copy"><div class="status-orb idle" id="taskOrb"></div><div><strong id="taskTitle">等待检测任务</strong><small id="taskSubtitle">导入节点并选择策略后开始</small></div></div>
+        <div class="progress-wrap"><div class="progress-track"><span id="progressBar"></span></div><b id="progressText">0%</b></div>
+        <div class="task-actions">
+          <button class="small-button" id="exportCsv" disabled>CSV</button>
+          <button class="small-button" id="exportJson" disabled>JSON</button>
+          <button class="small-button" id="exportMd" disabled>报告</button>
+        </div>
+      </section>
+
+      <section class="results-panel">
+        <div class="panel-header">
+          <div><span class="eyebrow">AUDIT MATRIX</span><h1>节点检测结果</h1></div>
+          <div class="view-meta"><span id="visibleCount">0 条</span><button class="small-button" id="refreshButton">刷新</button></div>
+        </div>
+        <div class="filter-bar">
+          <label class="search-box"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m16 16 4 4"/></svg><input id="resultSearch" placeholder="搜索备注、IP、ASN、ISP…"></label>
+          <select id="statusFilter"><option value="">全部状态</option><option value="success">成功</option><option value="failed">失败</option><option value="skipped">跳过</option></select>
+          <select id="protocolFilter"><option value="">全部协议</option></select>
+          <select id="riskFilter"><option value="">全部风险</option><option value="low">低风险</option><option value="medium">中风险</option><option value="high">高风险</option></select>
+          <select id="typeFilter"><option value="">全部类型</option><option value="residential_or_business">住宅/商业</option><option value="mobile">移动网络</option><option value="datacenter">数据中心</option><option value="proxy_or_transit">代理/中转</option></select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>节点</th><th>状态</th><th>出口 IP</th><th>位置 / ASN</th><th>网络类型</th><th>风险</th><th>延迟</th><th></th></tr></thead>
+            <tbody id="resultBody"></tbody>
+          </table>
+          <div class="empty-state" id="emptyState">
+            <div class="radar"><i></i><i></i><i></i><span></span></div>
+            <h3>等待第一批检测结果</h3><p>节点凭据只用于本机临时内核配置，任务结束后配置会自动删除。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="bottom-grid">
+        <article class="activity-card">
+          <div class="card-heading"><div><span class="eyebrow">LIVE FEED</span><h2>任务动态</h2></div><span class="live-indicator"><i></i>LOCAL</span></div>
+          <div class="event-list" id="eventList"><div class="event muted"><time>--:--:--</time><span>等待任务事件</span></div></div>
+        </article>
+        <article class="history-card">
+          <div class="card-heading"><div><span class="eyebrow">SESSION</span><h2>本次运行历史</h2></div></div>
+          <div class="history-list" id="historyList"><p class="muted-copy">当前服务启动后尚无任务</p></div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop hidden" id="settingsModal">
+    <section class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <header><div><span class="eyebrow">LOCAL VAULT</span><h2 id="settingsTitle">服务商与内核设置</h2><p>Key 仅保存在本机；Windows 使用当前用户 DPAPI 加密。</p></div><button class="icon-button" data-close="settingsModal">×</button></header>
+      <div class="modal-body">
+        <div class="settings-section"><h3>IP 情报服务商</h3><div class="settings-grid" id="keySettings"></div></div>
+        <div class="settings-section"><h3>检测内核路径</h3>
+          <label><span>sing-box.exe</span><input id="settingSingbox" placeholder="留空使用项目 bin/sing-box.exe"></label>
+          <label><span>xray.exe</span><input id="settingXray" placeholder="留空自动发现 v2rayN 内核"></label>
+        </div>
+        <p class="vault-note" id="vaultNote"></p>
+      </div>
+      <footer><button class="secondary" data-close="settingsModal">取消</button><button class="primary" id="saveSettings">加密保存设置</button></footer>
+    </section>
+  </div>
+
+  <div class="modal-backdrop hidden" id="detailModal">
+    <section class="modal detail-modal" role="dialog" aria-modal="true">
+      <header><div><span class="eyebrow">NODE PROFILE</span><h2 id="detailTitle">节点详情</h2></div><button class="icon-button" data-close="detailModal">×</button></header>
+      <div class="modal-body" id="detailBody"></div>
+    </section>
+  </div>
+
+  <div class="toast-stack" id="toastStack"></div>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

@@ -7,7 +7,7 @@ from pathlib import Path
 from lib_ipintel import enrich_ip_profile, build_unified_profile
 from lib_report import write_csv, build_summary_rows, write_markdown_report
 
-ROOT = Path(r'E:\Openclaw_Workspace\proxy_audit')
+from lib_paths import ROOT
 RESULT_RAW = ROOT / 'results' / 'raw'
 RESULT_CSV = ROOT / 'results' / 'csv'
 RESULT_REPORT = ROOT / 'results' / 'reports'

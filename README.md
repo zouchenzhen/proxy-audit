@@ -2,6 +2,53 @@
 
 Windows 11 下的代理节点批量检测工具。目标是从 v2rayN 备份 / 数据库 / 分享链接中读取节点，使用 sing-box 建立本地代理并真实出站测试，查询出口 IP 的多源情报，最后输出可读报表。
 
+## Web UI（推荐）
+
+双击项目根目录的 `start-web.cmd`，或者在 PowerShell 中运行：
+
+```powershell
+cd E:/Openclaw_Workspace/proxy_audit
+./start-web.ps1
+```
+
+浏览器会打开 `http://127.0.0.1:8765`。面板只监听本机，不对局域网或公网开放。
+
+Web UI 现已支持：
+
+- 粘贴分享链接、Base64 订阅正文、订阅 URL、TXT、v2rayN 备份 ZIP、`guiNDB.db`
+- 自动解析 VLESS、VMess、Trojan、Shadowsocks、Hysteria2、TUIC、AnyTLS
+- 在 sing-box 与 Xray 两个检测内核之间选择，并显示本机可用状态
+- 控制并发数、超时、节点上限以及运行前关键字筛选
+- 自选 IP-API、ipapi.is、IPinfo、IP2Location、IPQS、Scamalytics、AbuseIPDB
+- 后台任务进度、取消、事件流、结果搜索和多维筛选
+- 安全导出 CSV、JSON、Markdown；导出结果不会包含 UUID、密码或订阅地址
+- 可选延迟/抖动采样，以及默认关闭的 ChatGPT、Claude、GitHub、YouTube 端点探测
+
+> ChatGPT / Claude 等探测只说明指定端点可以访问，不等于账号可用、地区解锁或风控安全，因此不会参与默认质量评分。
+
+### Key 与节点凭据安全
+
+- 在 Web 设置中保存的 Key 会写入 `config.secure.json`；Windows 下使用当前用户 DPAPI 加密。
+- API 不会把已保存的 Key 回传给浏览器，只显示“已配置”状态。
+- 每个节点的临时内核配置会在检测后删除。
+- Web 新任务保存的 raw/CSV/Markdown 都会剔除 UUID、密码、订阅 URL 和日志尾部。
+- `config.local.json` 是旧版明文配置兼容入口。确认新设置已经保存后，建议手动删除旧文件。
+- `input/`、`results/`、`temp/`、本地配置和内核二进制均已加入 `.gitignore`。
+
+### 安装依赖
+
+启动脚本会检查依赖。也可以手动安装：
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+运行测试：
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
 ## 当前能力
 
 已有真实成功样本的协议：
@@ -16,10 +63,12 @@ Windows 11 下的代理节点批量检测工具。目标是从 v2rayN 备份 / �
 已接入的 IP 情报源：
 - ipify
 - ip-api
+- ipapi.is
 - IPinfo
 - IP2Location
 - IPQualityScore (IPQS)
 - Scamalytics
+- AbuseIPDB（需要 Key，可选）
 
 统一输出字段包括：
 - `ip_type_final`
@@ -32,16 +81,27 @@ Windows 11 下的代理节点批量检测工具。目标是从 v2rayN 备份 / �
 ```text
 proxy_audit/
 ├─ bin/
-│  └─ sing-box.exe
+│  ├─ sing-box.exe
+│  └─ xray.exe                 # 可选，也可在 Web 设置中指定
+├─ web/
+│  ├─ index.html
+│  ├─ styles.css
+│  └─ app.js
 ├─ scripts/
+│  ├─ web_app.py
 │  ├─ proxy_audit_batch.py
-│  ├─ enhance_existing_run.py
-│  ├─ generate_success_reports.py
 │  ├─ lib_v2rayn.py
-│  ├─ lib_singbox.py
+│  ├─ lib_kernels.py
+│  ├─ lib_runner.py
+│  ├─ lib_tasks.py
 │  ├─ lib_ipintel.py
+│  ├─ lib_secrets.py
 │  └─ lib_report.py
-├─ config.local.json
+├─ tests/
+├─ start-web.cmd
+├─ start-web.ps1
+├─ requirements.txt
+├─ config.secure.json          # 本机生成，不进入 Git
 ├─ README.md
 ├─ CHANGELOG.md
 ├─ results/
@@ -58,9 +118,10 @@ proxy_audit/
 
 - Windows 11
 - Python 3.x
-- `E:/Openclaw_Workspace/proxy_audit/bin/sing-box.exe`
+- `<项目目录>/bin/sing-box.exe`，或在 Web 设置中指定路径
+- Xray 为可选第二内核；可放入 `bin/xray.exe` 或指定现有 v2rayN 内核路径
 - 可访问外网
-- `config.local.json` 中填写好多源情报 API key
+- 推荐在 Web 设置中填写多源情报 API Key
 
 推荐先进入项目目录：
 
@@ -70,7 +131,11 @@ cd E:/Openclaw_Workspace/proxy_audit
 
 ## 配置文件
 
-### `config.local.json`
+### Web 加密设置（推荐）
+
+设置面板会生成 `config.secure.json`。Windows 下内容由 DPAPI 加密，只能由当前 Windows 用户解密。
+
+### `config.local.json`（旧版兼容）
 
 示例：
 
@@ -80,7 +145,8 @@ cd E:/Openclaw_Workspace/proxy_audit
   "ipinfo_api_key": "...",
   "ipqs_api_key": "...",
   "scamalytics_user": "...",
-  "scamalytics_api_key": "..."
+  "scamalytics_api_key": "...",
+  "abuseipdb_api_key": "..."
 }
 ```
 
@@ -208,9 +274,9 @@ python scripts/generate_success_reports.py --stamp 20260320_1434
 
 1. 从 ZIP / DB / 分享链接读取节点
 2. 将节点转换为统一结构
-3. 生成 sing-box 配置并启动本地 SOCKS
+3. 生成 sing-box 或 Xray 配置并启动本地 SOCKS
 4. 通过该 SOCKS 真实请求 `ipify` 获取出口 IP
-5. 查询 `ip-api + IPinfo + IP2Location + IPQS + Scamalytics`
+5. 按任务选择查询 `ip-api + ipapi.is + IPinfo + IP2Location + IPQS + Scamalytics + AbuseIPDB`
 6. 合并为统一画像字段
 7. 输出 JSON / CSV / Markdown
 

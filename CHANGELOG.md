@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## 2026-08-08
+
+### Web UI 2.0
+- 新增本地 Web 控制台：节点导入、任务进度、结果筛选、详情与安全导出
+- 新增 sing-box / Xray 双检测内核及可用性发现
+- 新增订阅 URL、Base64 正文、TXT、ZIP、SQLite 导入
+- 分享链接解析扩展到 VLESS / VMess / Trojan / Shadowsocks / Hysteria2 / TUIC / AnyTLS
+- 新增并发检测、取消任务、延迟/抖动采样和可选服务端点探测
+- 新增 ipapi.is 与 AbuseIPDB，所有情报源可按任务开关
+- Key 改为 Windows DPAPI 加密保存，Web API 仅返回配置状态
+- 新任务持久化和导出统一剔除节点 UUID、密码、订阅地址与日志尾部
+- 项目路径改为相对定位，可移动到其他目录运行
+- 新增解析器、内核配置与 Web API 自动测试
+
 ## 2026-03-20
 
 ### Added

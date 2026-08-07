@@ -1,4 +1,5 @@
 import json
+import base64
 import shutil
 import sqlite3
 import zipfile
@@ -6,8 +7,7 @@ from pathlib import Path
 from urllib.parse import urlparse, parse_qs, unquote
 from typing import List, Dict, Any, Optional
 
-ROOT = Path(r'E:\Openclaw_Workspace\proxy_audit')
-TEMP_DIR = ROOT / 'temp'
+from lib_paths import TEMP_DIR
 
 CONFIG_TYPE_MAP = {
     1: 'vmess',
@@ -113,6 +113,11 @@ def extract_backup_and_get_db(zip_path: str) -> Path:
         shutil.rmtree(target)
     target.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(zip_p, 'r') as zf:
+        target_root = target.resolve()
+        for member in zf.infolist():
+            destination = (target / member.filename).resolve()
+            if target_root != destination and target_root not in destination.parents:
+                raise ValueError(f'Unsafe path in backup ZIP: {member.filename}')
         zf.extractall(target)
     candidates = list(target.rglob('guiNDB.db'))
     if not candidates:
@@ -125,85 +130,31 @@ def load_from_v2ray_backup(zip_path: str) -> List[Dict[str, Any]]:
     return _read_sqlite_nodes(db_path, 'v2ray_backup', Path(zip_path).name)
 
 
-def parse_share_link(url: str) -> Dict[str, Any]:
-    url = url.strip()
-    u = urlparse(url)
-    if u.scheme.lower() == 'vless':
-        q = parse_qs(u.query)
-        return {
-            'index_id': None,
-            'protocol': 'vless',
-            'config_type': 5,
-            'remark': unquote(u.fragment) if u.fragment else f'{u.hostname}:{u.port}',
-            'server': u.hostname,
-            'server_port': u.port or 443,
-            'uuid': u.username,
-            'alter_id': 0,
-            'security': q.get('encryption', ['none'])[0],
-            'network': q.get('type', ['tcp'])[0].lower(),
-            'host': q.get('host', [u.hostname])[0],
-            'path': unquote(q.get('path', ['/'])[0]),
-            'tls_mode': q.get('security', [''])[0].lower(),
-            'insecure': q.get('insecure', q.get('allowInsecure', ['0']))[0] in ('1', 'true', 'True'),
-            'flow': q.get('flow', [''])[0],
-            'sni': q.get('sni', [u.hostname])[0],
-            'alpn': q.get('alpn', [''])[0],
-            'fp': q.get('fp', [''])[0],
-            'public_key': q.get('pbk', [''])[0],
-            'short_id': q.get('sid', [''])[0],
-            'extra': '',
-            'subid': '',
-            'is_subscription': False,
-            'source_type': 'share_link_file',
-            'source_name': 'input-file',
-            'subscription_name': '',
-            'subscription_url': '',
-        }
-    if u.scheme.lower() == 'trojan':
-        q = parse_qs(u.query)
-        return {
-            'index_id': None,
-            'protocol': 'trojan',
-            'config_type': 6,
-            'remark': unquote(u.fragment) if u.fragment else f'{u.hostname}:{u.port}',
-            'server': u.hostname,
-            'server_port': u.port or 443,
-            'uuid': u.username,
-            'password': u.username,
-            'alter_id': 0,
-            'security': '',
-            'network': q.get('type', ['tcp'])[0].lower(),
-            'host': q.get('host', [u.hostname])[0],
-            'path': unquote(q.get('path', ['/'])[0]),
-            'tls_mode': q.get('security', ['tls'])[0].lower(),
-            'insecure': q.get('insecure', q.get('allowInsecure', ['0']))[0] in ('1', 'true', 'True'),
-            'flow': '',
-            'sni': q.get('sni', [u.hostname])[0],
-            'alpn': q.get('alpn', [''])[0],
-            'fp': q.get('fp', [''])[0],
-            'public_key': '',
-            'short_id': '',
-            'extra': '',
-            'subid': '',
-            'is_subscription': False,
-            'source_type': 'share_link_file',
-            'source_name': 'input-file',
-            'subscription_name': '',
-            'subscription_url': '',
-        }
+def _decode_b64(value: str) -> str:
+    value = value.strip().replace('-', '+').replace('_', '/')
+    value += '=' * (-len(value) % 4)
+    return base64.b64decode(value).decode('utf-8', errors='strict')
+
+
+def _base_node(protocol: str, config_type: Optional[int], source_name: str = 'input-file') -> Dict[str, Any]:
     return {
         'index_id': None,
-        'protocol': u.scheme.lower(),
-        'config_type': None,
-        'remark': url[:80],
+        'protocol': protocol,
+        'config_type': config_type,
+        'remark': '',
         'server': '',
         'server_port': None,
         'uuid': '',
+        'password': '',
+        'hy2_password': '',
+        'obfs_password': '',
+        'tuic_password': '',
+        'congestion_control': '',
         'alter_id': 0,
         'security': '',
-        'network': '',
+        'network': 'tcp',
         'host': '',
-        'path': '',
+        'path': '/',
         'tls_mode': '',
         'insecure': False,
         'flow': '',
@@ -216,16 +167,155 @@ def parse_share_link(url: str) -> Dict[str, Any]:
         'subid': '',
         'is_subscription': False,
         'source_type': 'share_link_file',
-        'source_name': 'input-file',
+        'source_name': source_name,
         'subscription_name': '',
         'subscription_url': '',
     }
 
 
+def _bool_query(q: Dict[str, List[str]], *names: str) -> bool:
+    for name in names:
+        if name in q:
+            return str(q[name][0]).lower() in ('1', 'true', 'yes')
+    return False
+
+
+def parse_share_link(url: str, source_name: str = 'input-file') -> Dict[str, Any]:
+    url = url.strip()
+    if url.lower().startswith('vmess://'):
+        node = _base_node('vmess', 1, source_name)
+        try:
+            data = json.loads(_decode_b64(url.split('://', 1)[1]))
+            node.update({
+                'remark': data.get('ps') or f"{data.get('add')}:{data.get('port')}",
+                'server': data.get('add') or '',
+                'server_port': int(data.get('port') or 443),
+                'uuid': data.get('id') or '',
+                'alter_id': int(data.get('aid') or 0),
+                'security': data.get('scy') or data.get('security') or 'auto',
+                'network': (data.get('net') or 'tcp').lower(),
+                'host': data.get('host') or data.get('add') or '',
+                'path': data.get('path') or '/',
+                'tls_mode': (data.get('tls') or '').lower(),
+                'sni': data.get('sni') or data.get('host') or data.get('add') or '',
+                'alpn': data.get('alpn') or '',
+                'fp': data.get('fp') or '',
+                'insecure': str(data.get('allowInsecure') or '').lower() in ('1', 'true'),
+            })
+            return node
+        except Exception as exc:
+            node['remark'] = 'Invalid VMess link'
+            node['parse_error'] = str(exc)
+            return node
+
+    u = urlparse(url)
+    scheme = u.scheme.lower()
+    aliases = {'hy2': 'hysteria2'}
+    protocol = aliases.get(scheme, scheme)
+    config_types = {'vless': 5, 'trojan': 6, 'hysteria2': 7, 'tuic': 8, 'anytls': 11, 'ss': 4}
+    node = _base_node(protocol, config_types.get(protocol), source_name)
+    q = parse_qs(u.query)
+
+    if protocol in ('vless', 'trojan', 'hysteria2', 'tuic', 'anytls'):
+        username = unquote(u.username or '')
+        password = unquote(u.password or '')
+        node.update({
+            'remark': unquote(u.fragment) if u.fragment else f'{u.hostname}:{u.port}',
+            'server': u.hostname or '',
+            'server_port': u.port or 443,
+            'network': q.get('type', ['tcp'])[0].lower(),
+            'host': q.get('host', [u.hostname or ''])[0],
+            'path': unquote(q.get('path', ['/'])[0]),
+            'insecure': _bool_query(q, 'insecure', 'allowInsecure', 'allow_insecure'),
+            'sni': q.get('sni', [u.hostname or ''])[0],
+            'alpn': q.get('alpn', [''])[0],
+            'fp': q.get('fp', q.get('fingerprint', ['']))[0],
+        })
+        if protocol == 'vless':
+            node.update({
+                'uuid': username,
+                'security': q.get('encryption', ['none'])[0],
+                'tls_mode': q.get('security', [''])[0].lower(),
+                'flow': q.get('flow', [''])[0],
+                'public_key': q.get('pbk', q.get('publicKey', ['']))[0],
+                'short_id': q.get('sid', q.get('shortId', ['']))[0],
+            })
+        elif protocol == 'trojan':
+            node.update({'uuid': username, 'password': username, 'tls_mode': q.get('security', ['tls'])[0].lower()})
+        elif protocol == 'hysteria2':
+            auth = username if not password else f'{username}:{password}'
+            node.update({
+                'uuid': auth,
+                'password': auth,
+                'hy2_password': auth,
+                'tls_mode': 'tls',
+                'obfs_password': q.get('obfs-password', q.get('obfsPassword', ['']))[0],
+            })
+        elif protocol == 'tuic':
+            node.update({
+                'uuid': username,
+                'password': password,
+                'tuic_password': password,
+                'tls_mode': 'tls',
+                'congestion_control': q.get('congestion_control', q.get('congestion-control', ['']))[0],
+            })
+        elif protocol == 'anytls':
+            auth = username if not password else f'{username}:{password}'
+            node.update({'uuid': auth, 'password': auth, 'tls_mode': 'tls'})
+        return node
+
+    if scheme == 'ss':
+        try:
+            raw = url.split('://', 1)[1].split('#', 1)[0].split('?', 1)[0]
+            if '@' not in raw:
+                raw = _decode_b64(raw)
+            credentials, endpoint = raw.rsplit('@', 1)
+            if ':' not in credentials:
+                credentials = _decode_b64(credentials)
+            method, password = credentials.split(':', 1)
+            endpoint_url = urlparse('ss://' + endpoint)
+            node.update({
+                'remark': unquote(u.fragment) if u.fragment else endpoint,
+                'server': endpoint_url.hostname or '',
+                'server_port': endpoint_url.port,
+                'security': unquote(method),
+                'password': unquote(password),
+                'network': 'tcp',
+            })
+            return node
+        except Exception as exc:
+            node['remark'] = 'Invalid Shadowsocks link'
+            node['parse_error'] = str(exc)
+            return node
+
+    node.update({
+        'remark': unquote(u.fragment) if u.fragment else f'{scheme or "unknown"}:{u.hostname or "unparsed"}:{u.port or ""}',
+        'server': u.hostname or '',
+        'server_port': u.port,
+    })
+    return node
+
+
 def load_from_input_file(path: str) -> List[Dict[str, Any]]:
     p = Path(path)
-    lines = [x.strip() for x in p.read_text(encoding='utf-8', errors='ignore').splitlines() if x.strip()]
-    return [parse_share_link(line) for line in lines]
+    return load_from_text(p.read_text(encoding='utf-8', errors='ignore'), p.name)
+
+
+def load_from_text(text: str, source_name: str = 'pasted-links') -> List[Dict[str, Any]]:
+    normalized = text.strip().lstrip('\ufeff')
+    if '://' not in normalized and normalized:
+        try:
+            decoded = _decode_b64(''.join(normalized.split()))
+            if '://' in decoded:
+                normalized = decoded
+        except Exception:
+            pass
+    lines = [
+        line.strip()
+        for line in normalized.splitlines()
+        if line.strip() and not line.lstrip().startswith(('#', '//'))
+    ]
+    return [parse_share_link(line, source_name=source_name) for line in lines]
 
 
 def filter_nodes(nodes: List[Dict[str, Any]], filter_substring: str = '', protocols: Optional[List[str]] = None, limit: Optional[int] = None) -> List[Dict[str, Any]]:
@@ -306,6 +396,13 @@ def describe_support(node: Dict[str, Any]) -> (bool, str):
             return False, f'Trojan tls mode not implemented yet: {tls_mode}'
         if not node.get('password') and not node.get('uuid'):
             return False, 'Trojan node missing password/id'
+        return True, ''
+
+    if proto == 'ss':
+        if not node.get('server') or not node.get('server_port'):
+            return False, 'Shadowsocks node missing server/port'
+        if not node.get('security') or not node.get('password'):
+            return False, 'Shadowsocks node missing method/password'
         return True, ''
 
     return False, f'Protocol not implemented in current formal version: {proto}'

@@ -1,14 +1,15 @@
 import json
+import os
 import socket
 import subprocess
 import time
 from pathlib import Path
 from typing import Dict, Any
 
-ROOT = Path(r'E:\Openclaw_Workspace\proxy_audit')
-BIN = ROOT / 'bin' / 'sing-box.exe'
-CONFIG_DIR = ROOT / 'temp' / 'configs'
-LOG_DIR = ROOT / 'temp' / 'logs'
+from lib_paths import ROOT, BIN_DIR, CONFIG_DIR, LOG_DIR
+from lib_secrets import load_settings
+
+BIN = BIN_DIR / 'sing-box.exe'
 
 
 def ensure_runtime_dirs() -> None:
@@ -33,7 +34,7 @@ def wait_port(port: int, deadline_sec: int = 18) -> bool:
 
 def build_singbox_config(node: Dict[str, Any], socks_port: int) -> Dict[str, Any]:
     proto = (node.get('protocol') or '').lower()
-    if proto not in ('vless', 'vmess', 'anytls', 'hysteria2', 'tuic', 'trojan'):
+    if proto not in ('vless', 'vmess', 'anytls', 'hysteria2', 'tuic', 'trojan', 'ss'):
         raise ValueError(f"Unsupported protocol for sing-box builder: {node.get('protocol')}")
 
     outbound = {
@@ -46,6 +47,10 @@ def build_singbox_config(node: Dict[str, Any], socks_port: int) -> Dict[str, Any
         outbound['uuid'] = node['uuid']
     if proto in ('anytls', 'trojan'):
         outbound['password'] = node.get('password') or node.get('uuid')
+    if proto == 'ss':
+        outbound['type'] = 'shadowsocks'
+        outbound['method'] = node.get('security')
+        outbound['password'] = node.get('password')
     if proto == 'hysteria2':
         outbound['password'] = node.get('hy2_password') or node.get('password') or node.get('uuid')
         if node.get('obfs_password'):
@@ -89,7 +94,7 @@ def build_singbox_config(node: Dict[str, Any], socks_port: int) -> Dict[str, Any
         outbound['tls'] = tls_obj
 
     network = (node.get('network') or 'tcp').lower()
-    if proto in ('hysteria2', 'tuic'):
+    if proto in ('hysteria2', 'tuic', 'ss'):
         pass
     elif network == 'ws':
         outbound['transport'] = {
@@ -122,16 +127,24 @@ def build_singbox_config(node: Dict[str, Any], socks_port: int) -> Dict[str, Any
     }
 
 
-def start_singbox(config_path: Path, log_path: Path) -> subprocess.Popen:
-    if not BIN.exists():
-        raise FileNotFoundError(f'sing-box not found: {BIN}')
+def resolve_singbox_binary() -> Path:
+    configured = load_settings().get('singbox_path')
+    return Path(configured) if configured else BIN
+
+
+def start_singbox(config_path: Path, log_path: Path, binary_path: Path = None) -> subprocess.Popen:
+    binary_path = Path(binary_path) if binary_path else resolve_singbox_binary()
+    if not binary_path.exists():
+        raise FileNotFoundError(f'sing-box not found: {binary_path}')
     log_path.parent.mkdir(parents=True, exist_ok=True)
     logf = log_path.open('w', encoding='utf-8')
+    kwargs = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
     proc = subprocess.Popen(
-        [str(BIN), 'run', '-c', str(config_path)],
+        [str(binary_path), 'run', '-c', str(config_path)],
         stdout=logf,
         stderr=subprocess.STDOUT,
         cwd=str(ROOT),
+        **kwargs,
     )
     proc._openclaw_logf = logf
     return proc
@@ -146,7 +159,7 @@ def stop_singbox(proc: subprocess.Popen) -> None:
             proc.kill()
         except Exception:
             pass
-    logf = getattr(proc, '_openclaw_logf', None)
+    logf = getattr(proc, '_openclaw_logf', None) or getattr(proc, '_proxy_audit_logf', None)
     if logf:
         try:
             logf.close()

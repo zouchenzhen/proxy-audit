@@ -9,11 +9,10 @@ from urllib.parse import urlparse, parse_qs, unquote
 
 import requests
 
-ROOT = Path(r"E:\Openclaw_Workspace\proxy_audit")
-BIN = ROOT / "bin" / "sing-box.exe"
-CONFIG_DIR = ROOT / "temp" / "configs"
-LOG_DIR = ROOT / "temp" / "logs"
-RESULT_DIR = ROOT / "results"
+from lib_paths import ROOT, CONFIG_DIR, LOG_DIR, RESULT_DIR
+from lib_singbox import resolve_singbox_binary
+
+BIN = resolve_singbox_binary()
 
 NODES = [
     line.strip()
