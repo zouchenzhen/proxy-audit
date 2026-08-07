@@ -14,6 +14,15 @@
 - 项目路径改为相对定位，可移动到其他目录运行
 - 新增解析器、内核配置与 Web API 自动测试
 
+### 2.0 验收修正
+- 修复 125% 缩放/低高度视口下内核卡片越过侧栏、运行按钮遮挡配置项的问题
+- 设置弹窗锁定背景滚动，并将无标签复选框改为明确的“清除”控件
+- 新增隔离 Chrome 浏览器验收，覆盖布局、设置、导入、任务、导出启用与结果筛选
+- 按当前 v2rayN 枚举修正 Shadowsocks/SOCKS 类型，并适配 Password、Username、ProtoExtra、TransportExtra
+- 修复 TUIC ALPN 层级、AnyTLS 默认 TLS，以及新版 Xray 已移除的 allowInsecure 字段
+- 明确拒绝尚未实现的 Shadowsocks 插件传输，避免把无效配置误算为可检测节点
+- 新增隐私安全的本地真实网络验收脚本和验收报告
+
 ## 2026-03-20
 
 ### Added

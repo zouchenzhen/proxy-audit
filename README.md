@@ -46,19 +46,34 @@ python -m pip install -r requirements.txt
 运行测试：
 
 ```powershell
+python -m pip install -r requirements-dev.txt
 python -m unittest discover -s tests -v
+python tests/ui_browser_acceptance.py
+python tests/real_local_acceptance.py --db "E:\\path\\to\\v2rayN\\guiConfigs\\guiNDB.db"
 ```
 
-## 当前能力
+最后一条是可选的真实网络验收：默认每个“内核 × 协议”抽样 3 个节点，仅调用
+`ip-api`，且不会输出节点名称、服务器、凭据、订阅地址或出口 IP。节点过期或离线
+会被单独记为节点/上游不可达，不能据此直接判定解析器或内核适配失败。
 
-已有真实成功样本的协议：
-- VLESS
-- VMess
-- AnyTLS
-- Hysteria2
+第二条命令会启动隔离的本地后端和无头 Chrome，真实点击设置、导入、任务、筛选等 UI，并检查布局是否溢出或重叠。
 
-已接入但当前样本未成功：
-- TUIC
+## 当前能力与验收边界
+
+2026-08-08 使用本机当前 v2rayN 数据库做过隐私安全的抽样验收：
+
+| 协议 | sing-box | Xray | 本轮真实出口 |
+|---|---|---|---|
+| VLESS | 配置校验通过 | 配置校验通过 | 双内核成功 |
+| VMess | 配置校验通过 | 配置校验通过 | 双内核成功 |
+| Trojan | 配置校验通过 | 配置校验通过 | 抽样节点均不可达 |
+| Shadowsocks | 配置校验通过 | 配置校验通过 | 抽样节点均不可达；插件传输暂不支持 |
+| Hysteria2 | 配置校验通过 | 不支持 | sing-box 成功 |
+| TUIC | 配置校验通过 | 不支持 | sing-box 成功 |
+| AnyTLS | 配置校验通过 | 不支持 | 本轮抽样节点不可达；历史批次有成功样本 |
+
+“配置校验通过”表示已安装内核真实接受生成的 JSON，不等于任意第三方节点一定在线。
+完整、去标识化的验收记录见 `docs/acceptance-2026-08-08.md`。
 
 已接入的 IP 情报源：
 - ipify

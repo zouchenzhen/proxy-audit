@@ -33,6 +33,8 @@ def describe_xray_support(node: Dict[str, Any]):
         return False, f"Xray {proto} transport not implemented: {network}"
     if proto != "ss" and tls_mode not in {"", "tls", "reality"}:
         return False, f"Xray {proto} security mode not implemented: {tls_mode}"
+    if proto == "ss" and (network not in {"tcp", ""} or tls_mode):
+        return False, "Xray Shadowsocks plugin transport is not implemented"
     if tls_mode == "reality" and not node.get("public_key"):
         return False, "Reality node missing public key"
     if not node.get("server") or not node.get("server_port"):
@@ -53,7 +55,6 @@ def _stream_settings(node: Dict[str, Any]) -> Dict[str, Any]:
         stream["security"] = "tls"
         tls = {
             "serverName": node.get("sni") or node.get("server"),
-            "allowInsecure": bool(node.get("insecure")),
         }
         if node.get("fp"):
             tls["fingerprint"] = node.get("fp")

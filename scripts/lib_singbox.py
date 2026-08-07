@@ -60,9 +60,6 @@ def build_singbox_config(node: Dict[str, Any], socks_port: int) -> Dict[str, Any
         cc = node.get('congestion_control') or ''
         if cc:
             outbound['congestion_control'] = cc.lower()
-        alpn = [x.strip() for x in str(node.get('alpn') or '').split(',') if x.strip()]
-        if alpn:
-            outbound['alpn'] = alpn
         outbound['udp_relay_mode'] = 'native'
     if proto == 'vmess':
         security = (node.get('security') or 'auto').lower()
@@ -72,12 +69,17 @@ def build_singbox_config(node: Dict[str, Any], socks_port: int) -> Dict[str, Any
             outbound['alter_id'] = int(alter_id)
 
     tls_mode = (node.get('tls_mode') or '').lower()
-    if tls_mode in ('tls', 'reality'):
+    if proto in ('hysteria2', 'tuic', 'anytls') and not tls_mode:
+        tls_mode = 'tls'
+    if proto != 'ss' and tls_mode in ('tls', 'reality'):
         tls_obj = {
             'enabled': True,
             'server_name': node.get('sni') or node.get('server'),
             'insecure': bool(node.get('insecure', False)),
         }
+        alpn = [x.strip() for x in str(node.get('alpn') or '').split(',') if x.strip()]
+        if alpn:
+            tls_obj['alpn'] = alpn
         fp = node.get('fp') or ''
         if fp:
             tls_obj['utls'] = {

@@ -12,8 +12,8 @@ from lib_paths import TEMP_DIR
 CONFIG_TYPE_MAP = {
     1: 'vmess',
     2: 'custom',
-    3: 'socks',
-    4: 'shadowsocks',
+    3: 'ss',
+    4: 'socks',
     5: 'vless',
     6: 'trojan',
     7: 'hysteria2',
@@ -34,16 +34,52 @@ def protocol_from_config_type(config_type: Optional[int], row: Dict[str, Any]) -
     return f'unknown_{config_type}'
 
 
+def _json_object(value: Any) -> Dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    if not value:
+        return {}
+    try:
+        parsed = json.loads(value)
+        return parsed if isinstance(parsed, dict) else {}
+    except (TypeError, ValueError):
+        return {}
+
+
 def row_to_node(row: Dict[str, Any], sub_map: Dict[str, Dict[str, Any]], source_type: str, source_name: str) -> Dict[str, Any]:
     config_type = row.get('ConfigType')
     protocol = protocol_from_config_type(config_type, row)
     subid = row.get('Subid') or ''
     sub = sub_map.get(subid, {})
     remarks = row.get('Remarks') or f"{row.get('Address')}:{row.get('Port')}"
+    proto_extra = _json_object(row.get('ProtoExtra'))
+    transport_extra = _json_object(row.get('TransportExtra'))
     tls_mode = (row.get('StreamSecurity') or '').lower()
+    if protocol in ('hysteria2', 'tuic', 'anytls') and not tls_mode:
+        tls_mode = 'tls'
     network = (row.get('Network') or 'tcp').lower()
-    host = row.get('RequestHost') or row.get('Sni') or row.get('Address')
-    path = row.get('Path') or '/'
+    if network == 'raw':
+        network = 'tcp'
+    host = row.get('RequestHost') or transport_extra.get('Host') or row.get('Sni') or row.get('Address')
+    path = row.get('Path') or transport_extra.get('Path') or '/'
+
+    legacy_id = row.get('Id') or ''
+    username = row.get('Username') or ''
+    stored_password = row.get('Password') or ''
+    uuid_value = legacy_id or stored_password or username
+    password_value = stored_password or legacy_id or username
+    if protocol == 'tuic':
+        uuid_value = username or legacy_id
+    elif protocol == 'ss':
+        password_value = stored_password or username or legacy_id
+
+    security = row.get('Security') or ''
+    if protocol == 'vmess':
+        security = security or proto_extra.get('VmessSecurity') or 'auto'
+    elif protocol == 'vless':
+        security = security or proto_extra.get('VlessEncryption') or 'none'
+    elif protocol == 'ss':
+        security = proto_extra.get('SsMethod') or security
 
     node = {
         'index_id': row.get('IndexId'),
@@ -52,20 +88,20 @@ def row_to_node(row: Dict[str, Any], sub_map: Dict[str, Dict[str, Any]], source_
         'remark': remarks,
         'server': row.get('Address'),
         'server_port': row.get('Port'),
-        'uuid': row.get('Id'),
-        'password': row.get('Id'),
-        'hy2_password': row.get('Id'),
-        'obfs_password': row.get('Path') or '',
-        'tuic_password': row.get('Security') or '',
-        'congestion_control': row.get('HeaderType') or '',
-        'alter_id': row.get('AlterId'),
-        'security': row.get('Security'),
+        'uuid': uuid_value,
+        'password': password_value,
+        'hy2_password': stored_password or legacy_id or username,
+        'obfs_password': proto_extra.get('SalamanderPass') or '',
+        'tuic_password': stored_password or row.get('Security') or '',
+        'congestion_control': proto_extra.get('CongestionControl') or row.get('HeaderType') or '',
+        'alter_id': row.get('AlterId') if row.get('AlterId') is not None else proto_extra.get('AlterId'),
+        'security': security,
         'network': network,
         'host': host,
         'path': path,
         'tls_mode': tls_mode,
         'insecure': str(row.get('AllowInsecure') or '').lower() in ('1', 'true'),
-        'flow': row.get('Flow') or '',
+        'flow': row.get('Flow') or proto_extra.get('Flow') or '',
         'sni': row.get('Sni') or row.get('Address'),
         'alpn': row.get('Alpn') or '',
         'fp': row.get('Fingerprint') or '',
@@ -403,6 +439,8 @@ def describe_support(node: Dict[str, Any]) -> (bool, str):
             return False, 'Shadowsocks node missing server/port'
         if not node.get('security') or not node.get('password'):
             return False, 'Shadowsocks node missing method/password'
+        if network not in ('tcp', '') or tls_mode:
+            return False, 'Shadowsocks plugin transport is not implemented'
         return True, ''
 
     return False, f'Protocol not implemented in current formal version: {proto}'

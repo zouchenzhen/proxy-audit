@@ -130,8 +130,10 @@ function renderSettings() {
     const isConfigured = field === "scamalytics_user" ? settings.scamalytics_user_configured : configured[field];
     return `<div class="key-field">
       <label><span>${escapeHtml(keyLabels[field])}</span>${isConfigured ? "<b>已配置</b>" : ""}</label>
-      <input type="${isSecret ? "password" : "text"}" data-setting="${field}" autocomplete="off" placeholder="${isConfigured ? "留空保留现有值" : "未配置"}">
-      ${isConfigured ? `<input class="clear-key" type="checkbox" data-clear="${field}" title="勾选后清除">` : ""}
+      <div class="key-input-row">
+        <input type="${isSecret ? "password" : "text"}" data-setting="${field}" autocomplete="off" placeholder="${isConfigured ? "留空保留现有值" : "未配置"}">
+        ${isConfigured ? `<label class="clear-option" title="勾选后保存将清除此项"><input type="checkbox" data-clear="${field}"><span>清除</span></label>` : ""}
+      </div>
     </div>`;
   }).join("");
   $("#settingSingbox").value = settings.singbox_path || "";
@@ -340,8 +342,14 @@ function exportCurrent(format) {
   window.location.href = `/api/tasks/${state.currentTask.id}/export?format=${format}`;
 }
 
-function openModal(id) { $("#" + id).classList.remove("hidden"); }
-function closeModal(id) { $("#" + id).classList.add("hidden"); }
+function openModal(id) {
+  $("#" + id).classList.remove("hidden");
+  document.body.classList.add("modal-open");
+}
+function closeModal(id) {
+  $("#" + id).classList.add("hidden");
+  if (!$(".modal-backdrop:not(.hidden)")) document.body.classList.remove("modal-open");
+}
 
 function bindEvents() {
   initTabs();
