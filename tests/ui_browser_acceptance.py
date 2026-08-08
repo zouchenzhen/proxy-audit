@@ -2,6 +2,7 @@ import argparse
 import base64
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -15,6 +16,18 @@ import websocket
 
 
 ROOT = Path(__file__).resolve().parents[1]
+RUN_ID_PATTERN = re.compile(r"^\d{8}_\d{6}_[0-9a-f]{6}$")
+
+
+def cleanup_acceptance_run(task_id: str | None) -> None:
+    if not task_id or not RUN_ID_PATTERN.fullmatch(task_id):
+        return
+    for path in (
+        ROOT / "results" / "raw" / f"run_{task_id}.json",
+        ROOT / "results" / "csv" / f"run_{task_id}.csv",
+        ROOT / "results" / "reports" / f"run_{task_id}.md",
+    ):
+        path.unlink(missing_ok=True)
 
 
 def find_chrome() -> Path:
@@ -111,6 +124,7 @@ def main():
     )
     chrome_proc = None
     cdp = None
+    generated_task_id = None
     summary = {}
     try:
         wait_for(
@@ -236,6 +250,10 @@ def main():
         cdp.evaluate("document.querySelector('[data-close=" + json.dumps("settingsModal") + "]').click()")
         cdp.screenshot(light_screenshot)
         cdp.evaluate("document.querySelector('#startButton').click()")
+        generated_task_id = wait_for(
+            lambda: cdp.evaluate("sessionStorage.getItem('proxyScope.currentTask')"),
+            message="acceptance task id",
+        )
         wait_for(
             lambda: cdp.evaluate("document.querySelector('#taskTitle').textContent.includes('检测完成')"),
             timeout=20,
@@ -292,6 +310,7 @@ def main():
                     proc.wait(timeout=5)
                 except subprocess.TimeoutExpired:
                     proc.kill()
+        cleanup_acceptance_run(generated_task_id)
 
 
 if __name__ == "__main__":
