@@ -73,7 +73,18 @@ def create_app(testing: bool = False) -> Flask:
         updates = payload.get("updates") or {}
         clear_fields = payload.get("clear_fields") or []
         save_settings(updates, clear_fields)
-        return jsonify(public_settings())
+        settings = public_settings()
+        manager.reload_history(settings["history_limit"])
+        return jsonify(settings)
+
+    @app.get("/api/imports")
+    def list_imports():
+        return jsonify({"imports": manager.list_imports()})
+
+    @app.get("/api/imports/<import_id>")
+    def get_import(import_id):
+        imported = manager.get_public_import(import_id)
+        return jsonify(imported) if imported else (jsonify({"error": "Import not found"}), 404)
 
     @app.post("/api/import")
     def import_nodes():

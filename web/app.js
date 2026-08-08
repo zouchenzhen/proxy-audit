@@ -10,6 +10,11 @@ const state = {
   pollTimer: null,
 };
 
+const UI_THEME_KEY = "proxyScope.theme";
+const UI_FONT_KEY = "proxyScope.fontSize";
+const SESSION_IMPORT_KEY = "proxyScope.currentImport";
+const SESSION_TASK_KEY = "proxyScope.currentTask";
+
 const keyLabels = {
   ipinfo_api_key: "IPinfo API Token",
   ip2location_api_key: "IP2Location API Key",
@@ -48,6 +53,25 @@ function formatDuration(start, end) {
   if (!start) return "";
   const seconds = Math.max(0, Math.round((end || Date.now() / 1000) - start));
   return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
+function applyPreferences(theme = localStorage.getItem(UI_THEME_KEY) || "dark", fontSize = localStorage.getItem(UI_FONT_KEY) || "large") {
+  const resolvedTheme = theme === "system" ? (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark") : theme;
+  document.documentElement.dataset.theme = resolvedTheme;
+  document.documentElement.dataset.fontSize = fontSize;
+  localStorage.setItem(UI_THEME_KEY, theme);
+  localStorage.setItem(UI_FONT_KEY, fontSize);
+  if ($("#themeSelect")) $("#themeSelect").value = theme;
+  if ($("#fontSizeSelect")) $("#fontSizeSelect").value = fontSize;
+  if ($("#themeButton")) {
+    $("#themeButton span").textContent = resolvedTheme === "light" ? "☀" : "☾";
+    $("#themeButton").title = resolvedTheme === "light" ? "当前浅色；点击切换深色" : "当前深色；点击切换浅色";
+  }
+}
+
+function toggleTheme() {
+  const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+  applyPreferences(next, localStorage.getItem(UI_FONT_KEY) || "large");
 }
 
 function initTabs() {
@@ -138,6 +162,8 @@ function renderSettings() {
   }).join("");
   $("#settingSingbox").value = settings.singbox_path || "";
   $("#settingXray").value = settings.xray_path || "";
+  $("#settingHistoryLimit").value = settings.history_limit || 10;
+  applyPreferences(localStorage.getItem(UI_THEME_KEY) || "dark", localStorage.getItem(UI_FONT_KEY) || "large");
   $("#vaultNote").textContent = `存储方式：${settings.storage}。${settings.legacy_config_detected ? "检测到旧版 config.local.json；新保存值会优先使用加密配置。" : "页面不会回传或显示已保存的 Key。"}`;
 }
 
@@ -148,12 +174,15 @@ async function saveSettings() {
   if ($("#settingXray").value.trim()) updates.xray_path = $("#settingXray").value.trim();
   updates.default_timeout = Number($("#timeout").value || 15);
   updates.default_concurrency = Number($("#concurrency").value || 2);
+  updates.history_limit = Math.max(1, Math.min(Number($("#settingHistoryLimit").value || 10), 100));
+  applyPreferences($("#themeSelect").value, $("#fontSizeSelect").value);
   const clear_fields = $$('[data-clear]:checked').map(input => input.dataset.clear);
   try {
     const settings = await api("/api/settings", { method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify({updates, clear_fields}) });
     state.system.settings = settings;
     closeModal("settingsModal");
     await loadSystem();
+    await loadHistory();
     toast("设置已在本机加密保存", "success");
   } catch (error) { toast(error.message, "error"); }
 }
@@ -173,17 +202,45 @@ async function importNodes() {
   button.querySelector("span").textContent = "正在解析…";
   try {
     state.imported = await api("/api/import", { method: "POST", body: form });
-    const chips = Object.entries(state.imported.protocols).map(([key,value]) => `<span class="mini-chip">${escapeHtml(key)} · ${value}</span>`).join("");
-    $("#importSummary").innerHTML = `<strong>已识别 ${state.imported.total} 个唯一节点</strong><small>${escapeHtml(state.imported.source_label)}</small><div class="mini-chips">${chips}</div>`;
-    $("#importSummary").classList.remove("hidden");
-    $("#metricImported").textContent = state.imported.total;
-    $("#metricProtocols").textContent = Object.keys(state.imported.protocols).join(" / ");
-    $("#startButton").disabled = false;
-    $("#startHint").textContent = `${state.imported.total} 个节点待检测`;
-    populateProtocolFilter(Object.keys(state.imported.protocols));
+    state.currentTask = null;
+    sessionStorage.setItem(SESSION_IMPORT_KEY, state.imported.id);
+    sessionStorage.removeItem(SESSION_TASK_KEY);
+    ["resultSearch","statusFilter","riskFilter","typeFilter"].forEach(id => $("#" + id).value = "");
+    renderImport();
     toast("节点解析完成，凭据未在页面中显示", "success");
   } catch (error) { toast(error.message, "error"); }
   finally { button.disabled = false; button.querySelector("span").textContent = "解析并预览"; }
+}
+
+function previewRows() {
+  return (state.imported?.preview || []).map(node => ({...node, kernel: "待选择", supported: null, success: null, pending: true}));
+}
+
+function renderImport() {
+  if (!state.imported) return;
+  const chips = Object.entries(state.imported.protocols || {}).map(([key,value]) => `<span class="mini-chip">${escapeHtml(key)} · ${value}</span>`).join("");
+  const note = state.imported.preview_truncated ? `显示前 ${state.imported.preview_count} 条` : "节点列表已在右侧显示";
+  $("#importSummary").innerHTML = `<strong>已识别 ${state.imported.total} 个唯一节点</strong><small>${escapeHtml(state.imported.source_label)}</small><div class="mini-chips">${chips}</div><div class="preview-note">${escapeHtml(note)} · 凭据已隐藏</div>`;
+  $("#importSummary").classList.remove("hidden");
+  $("#metricImported").textContent = state.imported.total;
+  $("#metricProtocols").textContent = Object.keys(state.imported.protocols || {}).join(" / ");
+  $("#startButton").disabled = false;
+  $("#startHint").textContent = `${state.imported.total} 个节点待检测`;
+  populateProtocolFilter(Object.keys(state.imported.protocols || {}));
+  if (!state.currentTask) {
+    $("#metricSuccess").textContent = "—";
+    $("#metricSuccessRate").textContent = "尚未运行";
+    $("#metricLowRisk").textContent = "—";
+    $("#metricCivilian").textContent = "—";
+    $("#taskOrb").className = "status-orb idle";
+    $("#taskTitle").textContent = "等待检测任务";
+    $("#taskSubtitle").textContent = "已显示脱敏节点预览，选择策略后开始";
+    $("#progressBar").style.width = "0%";
+    $("#progressText").textContent = "0%";
+    [$("#exportCsv"),$("#exportJson"),$("#exportMd")].forEach(button => button.disabled = true);
+    renderEvents([]);
+  }
+  renderRows();
 }
 
 function selectedValues(selector) { return $$(selector).filter(input => input.checked).map(input => input.value); }
@@ -206,6 +263,7 @@ async function startTask() {
   if (!payload.providers.length) return toast("请至少选择一个 IP 情报源", "error");
   try {
     state.currentTask = await api("/api/tasks", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+    sessionStorage.setItem(SESSION_TASK_KEY, state.currentTask.id);
     $("#startButton").disabled = true;
     $("#cancelButton").classList.remove("hidden");
     renderTask();
@@ -254,12 +312,12 @@ function renderTask() {
   renderRows();
 }
 
-function rowStatus(row) { return row.success ? "success" : row.supported === false ? "skipped" : "failed"; }
+function rowStatus(row) { return row.pending ? "pending" : row.success ? "success" : row.supported === false ? "skipped" : "failed"; }
 function riskLabel(value) { return ({low:"低",medium:"中",high:"高"})[value] || "未知"; }
 function typeLabel(value) { return ({residential_or_business:"住宅/商业",mobile:"移动网络",datacenter:"数据中心",proxy_or_transit:"代理/中转"})[value] || "待判定"; }
 
 function filteredRows() {
-  let rows = [...(state.currentTask?.rows || [])];
+  let rows = state.currentTask ? [...(state.currentTask.rows || [])] : previewRows();
   const query = $("#resultSearch").value.trim().toLowerCase();
   const status = $("#statusFilter").value;
   const protocol = $("#protocolFilter").value;
@@ -275,15 +333,17 @@ function renderRows() {
   const rows = filteredRows();
   $("#visibleCount").textContent = `${rows.length} 条`;
   $("#emptyState").classList.toggle("hidden", rows.length > 0);
+  $("#emptyTitle").textContent = state.imported ? "没有符合筛选条件的节点" : "等待导入节点";
+  $("#emptyCopy").textContent = state.imported ? "请清除搜索词或筛选条件后重试。" : "解析后会立即显示脱敏节点列表；节点凭据不会出现在页面中。";
   $("#resultBody").innerHTML = rows.map((row, index) => {
     const status = rowStatus(row);
-    const statusText = status === "success" ? "成功" : status === "skipped" ? "跳过" : "失败";
+    const statusText = status === "pending" ? "待检测" : status === "success" ? "成功" : status === "skipped" ? "跳过" : "失败";
     const latency = row.latency_median_ms;
     const latencyClass = latency == null ? "" : latency < 250 ? "latency-good" : latency < 600 ? "latency-mid" : "latency-bad";
     return `<tr>
       <td><span class="cell-main" title="${escapeHtml(row.remark)}">${escapeHtml(row.remark || "未命名")}</span><span class="cell-sub">${escapeHtml(row.protocol)} · ${escapeHtml(row.kernel || "")}</span></td>
       <td><span class="status-badge status-${status}">${statusText}</span></td>
-      <td><span class="cell-main">${escapeHtml(row.exit_ip || "—")}</span><span class="cell-sub">${escapeHtml(row.server || "")} : ${escapeHtml(row.port || "")}</span></td>
+      <td><span class="cell-main">${escapeHtml(row.exit_ip || "—")}</span><span class="cell-sub">${escapeHtml(row.server || "")}${row.port ? ` : ${escapeHtml(row.port)}` : ""}</span></td>
       <td><span class="cell-main">${escapeHtml([row.country,row.city].filter(Boolean).join(" · ") || "—")}</span><span class="cell-sub" title="${escapeHtml(row.asn || row.asname)}">${escapeHtml(row.asn || row.asname || "无 ASN")}</span></td>
       <td><span class="type-badge">${typeLabel(row.ip_type_final)}</span><span class="cell-sub">${escapeHtml(row.native_ip_judgement || "")}</span></td>
       <td>${row.risk_level_final ? `<span class="risk-badge risk-${escapeHtml(row.risk_level_final)}">${riskLabel(row.risk_level_final)} · ${escapeHtml(row.risk_score_final)}</span>` : "—"}</td>
@@ -325,12 +385,43 @@ async function loadHistory() {
   try {
     const data = await api("/api/tasks");
     state.tasks = data.tasks || [];
-    $("#historyList").innerHTML = state.tasks.length ? state.tasks.slice(0,6).map(task => `<div class="history-item" data-task-id="${escapeHtml(task.id)}"><div><strong>${escapeHtml(task.kernel)} · ${escapeHtml(task.source_label)}</strong><small>${task.completed}/${task.total} · ${formatTime(task.created_at)}</small></div><b>${escapeHtml(task.status)}</b></div>`).join("") : '<p class="muted-copy">当前服务启动后尚无任务</p>';
+    $("#historyCount").textContent = `显示 ${state.tasks.length}/${state.system?.settings?.history_limit || 10} 条`;
+    $("#historyList").innerHTML = state.tasks.length ? state.tasks.map(task => `<div class="history-item" data-task-id="${escapeHtml(task.id)}"><div><strong>${escapeHtml(task.kernel)} · ${escapeHtml(task.source_label)}</strong><small>${task.completed}/${task.total} · ${formatTime(task.created_at)}</small></div><b>${escapeHtml(task.status)}</b></div>`).join("") : '<p class="muted-copy">本机尚无任务记录</p>';
     $$('[data-task-id]').forEach(item => item.addEventListener("click", async () => {
       state.currentTask = await api(`/api/tasks/${item.dataset.taskId}`);
+      sessionStorage.setItem(SESSION_TASK_KEY, state.currentTask.id);
       renderTask();
     }));
   } catch {}
+}
+
+async function restoreSession() {
+  const importId = sessionStorage.getItem(SESSION_IMPORT_KEY);
+  let importRestored = false;
+  if (importId) {
+    try {
+      state.imported = await api(`/api/imports/${importId}`);
+      renderImport();
+      importRestored = true;
+    } catch { sessionStorage.removeItem(SESSION_IMPORT_KEY); }
+  }
+  const rememberedTask = sessionStorage.getItem(SESSION_TASK_KEY);
+  const taskId = rememberedTask || (!importRestored ? state.tasks[0]?.id : null);
+  if (taskId) {
+    try {
+      state.currentTask = await api(`/api/tasks/${taskId}`);
+      sessionStorage.setItem(SESSION_TASK_KEY, taskId);
+      renderTask();
+      if (["queued","running","cancelling"].includes(state.currentTask.status)) schedulePoll(500);
+    } catch {
+      sessionStorage.removeItem(SESSION_TASK_KEY);
+      if (state.tasks[0]?.id && state.tasks[0].id !== taskId) {
+        state.currentTask = await api(`/api/tasks/${state.tasks[0].id}`);
+        sessionStorage.setItem(SESSION_TASK_KEY, state.currentTask.id);
+        renderTask();
+      }
+    }
+  }
 }
 
 function populateProtocolFilter(protocols) {
@@ -359,6 +450,9 @@ function bindEvents() {
   $("#cancelButton").addEventListener("click", cancelTask);
   $("#refreshButton").addEventListener("click", () => state.currentTask ? pollTask() : loadHistory());
   $("#settingsButton").addEventListener("click", () => openModal("settingsModal"));
+  $("#themeButton").addEventListener("click", toggleTheme);
+  $("#themeSelect").addEventListener("change", () => applyPreferences($("#themeSelect").value, $("#fontSizeSelect").value));
+  $("#fontSizeSelect").addEventListener("change", () => applyPreferences($("#themeSelect").value, $("#fontSizeSelect").value));
   $("#saveSettings").addEventListener("click", saveSettings);
   $$('[data-close]').forEach(button => button.addEventListener("click", () => closeModal(button.dataset.close)));
   $$(".modal-backdrop").forEach(backdrop => backdrop.addEventListener("click", event => { if (event.target === backdrop) closeModal(backdrop.id); }));
@@ -374,9 +468,11 @@ function bindEvents() {
 }
 
 async function boot() {
+  applyPreferences();
   bindEvents();
   await loadSystem();
   await loadHistory();
+  await restoreSession();
 }
 
 boot();

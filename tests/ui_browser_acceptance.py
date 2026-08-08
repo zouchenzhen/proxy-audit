@@ -210,6 +210,31 @@ def main():
         wait_for(lambda: cdp.evaluate("!document.querySelector('#importSummary').classList.contains('hidden')"), message="UI node import")
         assert cdp.evaluate("document.querySelector('#metricImported').textContent") == "1"
         assert cdp.evaluate("document.querySelector('#startButton').disabled") is False
+        assert cdp.evaluate("document.querySelectorAll('#resultBody tr').length") == 1
+        assert cdp.evaluate("document.querySelector('#resultBody .status-pending').textContent") == "待检测"
+        assert "Browser-Acceptance" in cdp.evaluate("document.querySelector('#resultBody').textContent")
+
+        cdp.call("Page.reload", {"ignoreCache": True})
+        wait_for(lambda: cdp.evaluate("document.readyState === 'complete'"), message="preview page reload")
+        wait_for(lambda: cdp.evaluate("document.querySelectorAll('#resultBody tr').length === 1"), message="import preview restore")
+        assert cdp.evaluate("document.querySelector('#resultBody .status-pending').textContent") == "待检测"
+        preview_screenshot = Path(args.screenshot).with_name(Path(args.screenshot).stem + "-preview" + Path(args.screenshot).suffix)
+        cdp.screenshot(preview_screenshot)
+
+        previous_theme = cdp.evaluate("document.documentElement.dataset.theme")
+        cdp.evaluate("document.querySelector('#themeButton').click()")
+        assert cdp.evaluate("document.documentElement.dataset.theme") != previous_theme
+        cdp.evaluate("""
+          document.querySelector('#settingsButton').click();
+          const theme = document.querySelector('#themeSelect');
+          theme.value = 'light'; theme.dispatchEvent(new Event('change', {bubbles:true}));
+          const font = document.querySelector('#fontSizeSelect');
+          font.value = 'xlarge'; font.dispatchEvent(new Event('change', {bubbles:true}));
+        """)
+        assert cdp.evaluate("document.documentElement.dataset.fontSize") == "xlarge"
+        light_screenshot = Path(args.screenshot).with_name(Path(args.screenshot).stem + "-light" + Path(args.screenshot).suffix)
+        cdp.evaluate("document.querySelector('[data-close=" + json.dumps("settingsModal") + "]').click()")
+        cdp.screenshot(light_screenshot)
         cdp.evaluate("document.querySelector('#startButton').click()")
         wait_for(
             lambda: cdp.evaluate("document.querySelector('#taskTitle').textContent.includes('检测完成')"),
@@ -218,6 +243,12 @@ def main():
         )
         assert cdp.evaluate("document.querySelectorAll('#resultBody tr').length") == 1
         assert cdp.evaluate("document.querySelector('#exportJson').disabled") is False
+        cdp.call("Page.reload", {"ignoreCache": True})
+        wait_for(lambda: cdp.evaluate("document.readyState === 'complete'"), message="result page reload")
+        wait_for(lambda: cdp.evaluate("document.querySelector('#taskTitle').textContent.includes('检测完成')"), message="task result restore")
+        assert cdp.evaluate("document.querySelectorAll('#resultBody tr').length") == 1
+        assert cdp.evaluate("document.documentElement.dataset.theme") == "light"
+        assert cdp.evaluate("document.documentElement.dataset.fontSize") == "xlarge"
         cdp.evaluate("""
           const status = document.querySelector('#statusFilter');
           status.value = 'skipped'; status.dispatchEvent(new Event('input', {bubbles:true}));
@@ -237,10 +268,15 @@ def main():
             "geometry": geometry,
             "settingsModal": modal,
             "uiImport": "passed",
+            "importPreviewRestore": "passed",
             "uiTask": "passed",
+            "taskResultRestore": "passed",
+            "themeAndFontPersistence": "passed",
             "resultFiltering": "passed",
             "javascriptExceptions": 0,
             "screenshot": str(Path(args.screenshot)),
+            "previewScreenshot": str(preview_screenshot),
+            "lightScreenshot": str(light_screenshot),
         }
         print(json.dumps(summary, ensure_ascii=False))
     finally:

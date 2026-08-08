@@ -32,6 +32,10 @@ class WebApiTests(unittest.TestCase):
         serialized = str(payload)
         self.assertNotIn("00000000-0000-0000-0000-000000000099", serialized)
         self.assertEqual(payload["preview"][0]["remark"], "WebTest")
+        restored = self.client.get(f"/api/imports/{payload['id']}")
+        self.assertEqual(restored.status_code, 200)
+        self.assertEqual(restored.get_json()["preview"][0]["remark"], "WebTest")
+        self.assertNotIn("00000000-0000-0000-0000-000000000099", str(restored.get_json()))
 
     def test_import_text_file(self):
         data = {"source_type":"file", "file":(io.BytesIO(b"trojan://safe@example.com:443#Trojan"), "nodes.txt")}

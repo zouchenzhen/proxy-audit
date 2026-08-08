@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="dark light">
   <title>ProxyScope · 节点 IP 质量审计</title>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
@@ -16,7 +16,8 @@
     </div>
     <div class="top-actions">
       <div class="health-pill"><i id="healthDot"></i><span id="healthText">连接本地引擎…</span></div>
-      <button class="icon-button" id="settingsButton" title="服务商与内核设置" aria-label="打开设置">
+      <button class="icon-button theme-button" id="themeButton" title="切换深色/浅色模式" aria-label="切换深色或浅色模式"><span>◐</span></button>
+      <button class="icon-button" id="settingsButton" title="本机设置" aria-label="打开本机设置">
         <svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.55V21h-4v-.08A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1.03H3v-4h.08A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 10 3.02V3h4v.08a1.7 1.7 0 0 0 1.03 1.52 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 7l-.06.06a1.7 1.7 0 0 0-.34 1.88c.25.62.86 1.03 1.55 1.03H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg>
       </button>
     </div>
@@ -100,12 +101,12 @@
 
       <section class="results-panel">
         <div class="panel-header">
-          <div><span class="eyebrow">AUDIT MATRIX</span><h1>节点检测结果</h1></div>
+          <div><span class="eyebrow">AUDIT MATRIX</span><h1>节点列表与检测结果</h1></div>
           <div class="view-meta"><span id="visibleCount">0 条</span><button class="small-button" id="refreshButton">刷新</button></div>
         </div>
         <div class="filter-bar">
           <label class="search-box"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m16 16 4 4"/></svg><input id="resultSearch" placeholder="搜索备注、IP、ASN、ISP…"></label>
-          <select id="statusFilter"><option value="">全部状态</option><option value="success">成功</option><option value="failed">失败</option><option value="skipped">跳过</option></select>
+          <select id="statusFilter"><option value="">全部状态</option><option value="pending">待检测</option><option value="success">成功</option><option value="failed">失败</option><option value="skipped">跳过</option></select>
           <select id="protocolFilter"><option value="">全部协议</option></select>
           <select id="riskFilter"><option value="">全部风险</option><option value="low">低风险</option><option value="medium">中风险</option><option value="high">高风险</option></select>
           <select id="typeFilter"><option value="">全部类型</option><option value="residential_or_business">住宅/商业</option><option value="mobile">移动网络</option><option value="datacenter">数据中心</option><option value="proxy_or_transit">代理/中转</option></select>
@@ -117,7 +118,7 @@
           </table>
           <div class="empty-state" id="emptyState">
             <div class="radar"><i></i><i></i><i></i><span></span></div>
-            <h3>等待第一批检测结果</h3><p>节点凭据只用于本机临时内核配置，任务结束后配置会自动删除。</p>
+            <h3 id="emptyTitle">等待导入节点</h3><p id="emptyCopy">解析后会立即显示脱敏节点列表；节点凭据不会出现在页面中。</p>
           </div>
         </div>
       </section>
@@ -128,8 +129,8 @@
           <div class="event-list" id="eventList"><div class="event muted"><time>--:--:--</time><span>等待任务事件</span></div></div>
         </article>
         <article class="history-card">
-          <div class="card-heading"><div><span class="eyebrow">SESSION</span><h2>本次运行历史</h2></div></div>
-          <div class="history-list" id="historyList"><p class="muted-copy">当前服务启动后尚无任务</p></div>
+          <div class="card-heading"><div><span class="eyebrow">SESSION</span><h2>最近任务</h2></div><small id="historyCount" class="history-count">默认 10 条</small></div>
+          <div class="history-list" id="historyList"><p class="muted-copy">本机尚无任务记录</p></div>
         </article>
       </section>
     </main>
@@ -137,12 +138,20 @@
 
   <div class="modal-backdrop hidden" id="settingsModal">
     <section class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
-      <header><div><span class="eyebrow">LOCAL VAULT</span><h2 id="settingsTitle">服务商与内核设置</h2><p>Key 仅保存在本机；Windows 使用当前用户 DPAPI 加密。</p></div><button class="icon-button" data-close="settingsModal">×</button></header>
+      <header><div><span class="eyebrow">LOCAL VAULT</span><h2 id="settingsTitle">本机设置</h2><p>Key 仅保存在本机；Windows 使用当前用户 DPAPI 加密。</p></div><button class="icon-button" data-close="settingsModal">×</button></header>
       <div class="modal-body">
         <div class="settings-section"><h3>IP 情报服务商</h3><div class="settings-grid" id="keySettings"></div></div>
         <div class="settings-section"><h3>检测内核路径</h3>
           <label><span>sing-box.exe</span><input id="settingSingbox" placeholder="留空使用项目 bin/sing-box.exe"></label>
           <label><span>xray.exe</span><input id="settingXray" placeholder="留空自动发现 v2rayN 内核"></label>
+        </div>
+        <div class="settings-section"><h3>界面与记录</h3>
+          <div class="preference-grid">
+            <label><span>颜色模式</span><select id="themeSelect"><option value="system">跟随系统</option><option value="dark">深色</option><option value="light">浅色</option></select></label>
+            <label><span>界面字号</span><select id="fontSizeSelect"><option value="standard">标准</option><option value="large">较大（推荐）</option><option value="xlarge">特大</option></select></label>
+            <label><span>最近任务显示数</span><input id="settingHistoryLimit" type="number" min="1" max="100" value="10"></label>
+          </div>
+          <p class="preference-note">主题和字号保存在当前浏览器；任务显示数保存在本机后端。减少数量不会删除已有报告文件。</p>
         </div>
         <p class="vault-note" id="vaultNote"></p>
       </div>

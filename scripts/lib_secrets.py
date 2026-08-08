@@ -24,6 +24,7 @@ ALLOWED_FIELDS = SECRET_FIELDS | {
     "xray_path",
     "default_timeout",
     "default_concurrency",
+    "history_limit",
 }
 
 
@@ -112,7 +113,7 @@ def save_settings(updates: Dict[str, Any], clear_fields=None) -> Dict[str, Any]:
     for key, value in updates.items():
         if key not in ALLOWED_FIELDS or value is None or value == "":
             continue
-        if key in {"default_timeout", "default_concurrency"}:
+        if key in {"default_timeout", "default_concurrency", "history_limit"}:
             value = int(value)
         current[key] = value
 
@@ -139,6 +140,7 @@ def public_settings() -> Dict[str, Any]:
         "xray_path": settings.get("xray_path") or "",
         "default_timeout": int(settings.get("default_timeout") or 15),
         "default_concurrency": int(settings.get("default_concurrency") or 2),
+        "history_limit": max(1, min(int(settings.get("history_limit") or 10), 100)),
         "storage": "Windows DPAPI" if os.name == "nt" else "local file",
         "legacy_config_detected": LEGACY_CONFIG.exists(),
     }

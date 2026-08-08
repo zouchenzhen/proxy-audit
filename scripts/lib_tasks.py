@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+import re
 import threading
 import time
 import uuid
@@ -12,7 +13,11 @@ from lib_ipintel import DEFAULT_PROVIDERS, SERVICE_TARGETS
 from lib_paths import RESULT_CSV, RESULT_RAW, RESULT_REPORT, ensure_project_dirs
 from lib_report import build_summary_rows, write_csv, write_markdown_report
 from lib_runner import run_node
+from lib_secrets import load_settings
 from lib_v2rayn import filter_nodes
+
+
+WEB_RUN_PATTERN = re.compile(r"^run_(\d{8}_\d{6}_[0-9a-f]{6})\.json$")
 
 
 def safe_node(node: Dict[str, Any]) -> Dict[str, Any]:
@@ -42,12 +47,15 @@ def protocol_counts(nodes: List[Dict[str, Any]]) -> Dict[str, int]:
 
 
 class TaskManager:
-    def __init__(self):
+    def __init__(self, history_limit: Optional[int] = None):
         ensure_project_dirs()
         self.imports: Dict[str, Dict[str, Any]] = {}
         self.tasks: Dict[str, Dict[str, Any]] = {}
         self._cancel: Dict[str, threading.Event] = {}
         self._lock = threading.RLock()
+        configured_limit = history_limit if history_limit is not None else load_settings().get("history_limit", 10)
+        self.history_limit = max(1, min(int(configured_limit or 10), 100))
+        self.reload_history(self.history_limit)
 
     def add_import(self, nodes: List[Dict[str, Any]], source_label: str) -> Dict[str, Any]:
         import_id = uuid.uuid4().hex[:12]
@@ -63,20 +71,34 @@ class TaskManager:
                 self.imports.pop(next(iter(self.imports)))
         return self.public_import(record)
 
-    def public_import(self, record: Dict[str, Any]) -> Dict[str, Any]:
+    def public_import(self, record: Dict[str, Any], include_preview: bool = True) -> Dict[str, Any]:
         nodes = record["nodes"]
-        return {
+        output = {
             "id": record["id"],
             "source_label": record["source_label"],
             "created_at": record["created_at"],
             "total": len(nodes),
             "protocols": protocol_counts(nodes),
-            "preview": [safe_node(node) for node in nodes[:200]],
         }
+        if include_preview:
+            output["preview"] = [safe_node(node) for node in nodes[:500]]
+            output["preview_count"] = len(output["preview"])
+            output["preview_truncated"] = len(nodes) > len(output["preview"])
+        return output
 
     def get_import(self, import_id: str) -> Optional[Dict[str, Any]]:
         with self._lock:
             return self.imports.get(import_id)
+
+    def get_public_import(self, import_id: str) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            record = self.imports.get(import_id)
+            return self.public_import(record) if record else None
+
+    def list_imports(self) -> List[Dict[str, Any]]:
+        with self._lock:
+            records = sorted(self.imports.values(), key=lambda item: item["created_at"], reverse=True)
+            return [self.public_import(record, include_preview=False) for record in records]
 
     def start_task(self, spec: Dict[str, Any]) -> Dict[str, Any]:
         imported = self.get_import(str(spec.get("import_id") or ""))
@@ -197,8 +219,8 @@ class TaskManager:
             task["rows"] = build_summary_rows(task["results"])
             task["status"] = "cancelled" if cancel.is_set() else "completed"
             task["finished_at"] = time.time()
-            self._persist(task)
             self._event(task, "info", f"任务{task['status']}：成功 {task['success']}，失败 {task['failed']}，跳过 {task['skipped']}")
+            self._persist(task)
             task.pop("nodes", None)
 
     def _persist(self, task: Dict[str, Any]) -> None:
@@ -219,7 +241,9 @@ class TaskManager:
             "settings": task["settings"],
             "status": task["status"],
             "created_at": task["created_at"],
+            "started_at": task.get("started_at"),
             "finished_at": task["finished_at"],
+            "events": task.get("events") or [],
             "results": safe_results,
         }
         raw_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -257,7 +281,61 @@ class TaskManager:
 
     def list_tasks(self) -> List[Dict[str, Any]]:
         with self._lock:
-            return [self.public_task(task, include_rows=False) for task in reversed(list(self.tasks.values()))]
+            tasks = sorted(self.tasks.values(), key=lambda item: item.get("created_at") or 0, reverse=True)
+            return [self.public_task(task, include_rows=False) for task in tasks[:self.history_limit]]
+
+    def reload_history(self, history_limit: int) -> None:
+        self.history_limit = max(1, min(int(history_limit or 10), 100))
+        candidates = []
+        for path in RESULT_RAW.glob("run_*.json"):
+            match = WEB_RUN_PATTERN.match(path.name)
+            if match:
+                candidates.append((path.stat().st_mtime, match.group(1), path))
+        for _mtime, run_id, path in sorted(candidates, reverse=True)[:self.history_limit]:
+            if run_id in self.tasks:
+                continue
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                results = payload.get("results") or []
+                if not isinstance(results, list):
+                    continue
+                success = sum(1 for item in results if item.get("success"))
+                skipped = sum(1 for item in results if item.get("supported") is False)
+                cancelled = sum(1 for item in results if item.get("cancelled"))
+                failed = len(results) - success - skipped - cancelled
+                finished_at = payload.get("finished_at") or path.stat().st_mtime
+                task = {
+                    "id": run_id,
+                    "status": payload.get("status") or "completed",
+                    "source_label": payload.get("source_label") or "restored run",
+                    "kernel": payload.get("kernel") or "unknown",
+                    "created_at": payload.get("created_at") or finished_at,
+                    "started_at": payload.get("started_at") or payload.get("created_at") or finished_at,
+                    "finished_at": finished_at,
+                    "total": len(results),
+                    "completed": len(results),
+                    "success": success,
+                    "failed": failed,
+                    "skipped": skipped,
+                    "cancelled": cancelled,
+                    "progress": 100.0,
+                    "settings": payload.get("settings") or {},
+                    "events": payload.get("events") or [{
+                        "time": finished_at,
+                        "level": "info",
+                        "message": f"已从本机记录恢复：成功 {success}，失败 {failed}，跳过 {skipped}",
+                    }],
+                    "results": results,
+                    "rows": build_summary_rows(results),
+                    "paths": {
+                        "raw": str(path),
+                        "csv": str(RESULT_CSV / f"run_{run_id}.csv"),
+                        "markdown": str(RESULT_REPORT / f"run_{run_id}.md"),
+                    },
+                }
+                self.tasks[run_id] = task
+            except (OSError, ValueError, TypeError):
+                continue
 
     def safe_json_export(self, task_id: str) -> str:
         task = self.get_task(task_id)
