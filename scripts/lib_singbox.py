@@ -81,7 +81,10 @@ def build_singbox_config(node: Dict[str, Any], socks_port: int) -> Dict[str, Any
         if alpn:
             tls_obj['alpn'] = alpn
         fp = node.get('fp') or ''
-        if fp:
+        # Hysteria2 and TUIC run TLS over QUIC. sing-box's uTLS client is for
+        # TCP TLS and rejects these QUIC outbounds at connection time with
+        # "unsupported usage for uTLS".
+        if fp and proto not in ('hysteria2', 'tuic'):
             tls_obj['utls'] = {
                 'enabled': True,
                 'fingerprint': fp,

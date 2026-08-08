@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from lib_singbox import build_singbox_config, resolve_singbox_binary
+from lib_runner import friendly_run_error
 from lib_v2rayn import describe_support, load_from_text, parse_share_link, row_to_node
 from lib_xray import build_xray_config, describe_xray_support, resolve_xray_binary
 
@@ -113,11 +114,23 @@ class KernelConfigTests(unittest.TestCase):
         self.assertNotIn("allowInsecure", config["outbounds"][0]["streamSettings"]["tlsSettings"])
 
     def test_tuic_alpn_is_nested_under_tls(self):
-        node = parse_share_link("tuic://00000000-0000-0000-0000-000000000006:safe-password@example.com:443?sni=t.example.com&alpn=h3&congestion_control=bbr#TUIC")
+        node = parse_share_link("tuic://00000000-0000-0000-0000-000000000006:safe-password@example.com:443?sni=t.example.com&alpn=h3&congestion_control=bbr&fp=chrome#TUIC")
         config = build_singbox_config(node, 23127)
         outbound = config["outbounds"][0]
         self.assertNotIn("alpn", outbound)
         self.assertEqual(outbound["tls"]["alpn"], ["h3"])
+        self.assertNotIn("utls", outbound["tls"])
+
+    def test_hysteria2_quic_does_not_enable_utls(self):
+        node = parse_share_link("hysteria2://safe-password@example.com:443?sni=h.example.com&fp=chrome#HY2")
+        config = build_singbox_config(node, 23128)
+        self.assertNotIn("utls", config["outbounds"][0]["tls"])
+
+    def test_user_facing_error_hides_low_level_socks_details(self):
+        error = ConnectionError("SOCKSHTTPSConnectionPool object at 0x123: 0x01 General SOCKS server failure")
+        summary = friendly_run_error(error, "unsupported usage for uTLS")
+        self.assertEqual(summary, "内核配置不兼容：当前协议不能使用 uTLS 指纹")
+        self.assertNotIn("0x123", summary)
 
     def test_installed_kernels_accept_generated_configs(self):
         vmess_payload = {

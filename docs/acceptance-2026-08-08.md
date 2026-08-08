@@ -76,3 +76,17 @@
 - SOCKS、HTTP、WireGuard、策略组/链式代理不在当前正式检测范围。
 - Xray 不承担 Hysteria2、TUIC、AnyTLS 检测。
 - ChatGPT/Claude/GitHub/YouTube 仅做可达性检查，不做完整解锁判定。
+
+## 17:02 用户运行问题复验
+
+用户实际运行中 4 个 Hysteria2/TUIC 节点在 `api.ipify.org` 阶段显示
+`0x01 General SOCKS server failure`。对应 sing-box 日志的真实根因均为
+`unsupported usage for uTLS`：生成器错误地把浏览器指纹作为 uTLS 配置附加给
+基于 QUIC 的 Hysteria2/TUIC。
+
+修复后：
+
+- Hysteria2/TUIC 的 TLS 配置不再生成 `utls`；TCP TLS 协议的指纹支持保持不变。
+- 截图中的 4 个同名节点逐个真实复测，4/4 成功出站，uTLS 错误 0。
+- 自动测试增加到 20 项，包含 Hysteria2/TUIC 指纹回归和错误信息脱敏测试。
+- 任务动态显示稳定的中文错误分类；对象内存地址和整段 urllib3/SOCKS 异常不再进入 UI。

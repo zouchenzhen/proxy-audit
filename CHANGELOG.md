@@ -22,6 +22,8 @@
 - 修复 TUIC ALPN 层级、AnyTLS 默认 TLS，以及新版 Xray 已移除的 allowInsecure 字段
 - 明确拒绝尚未实现的 Shadowsocks 插件传输，避免把无效配置误算为可检测节点
 - 新增隐私安全的本地真实网络验收脚本和验收报告
+- 修复 Hysteria2/TUIC 被错误附加 uTLS 指纹而在出站时报 `unsupported usage for uTLS`
+- 任务动态改用稳定的中文错误分类，不再显示含对象地址的底层 SOCKS/Python 异常串
 
 ## 2026-03-20
 

@@ -16,6 +16,25 @@ def tail_text(path: Path, chars: int = 2400) -> str:
         return ""
 
 
+def friendly_run_error(error: Exception, log_tail: str = "") -> str:
+    """Return a stable, user-facing category without leaking object addresses."""
+    detail = f"{type(error).__name__}: {error}"
+    combined = f"{detail}\n{log_tail}".lower()
+    if "unsupported usage for utls" in combined:
+        return "内核配置不兼容：当前协议不能使用 uTLS 指纹"
+    if "did not become ready" in combined:
+        return "检测内核未能启动本地 SOCKS 监听"
+    if "general socks server failure" in combined:
+        return "代理内核未能建立出站连接（节点、协议参数或上游网络异常）"
+    if any(token in combined for token in ("timed out", "timeout", "deadline exceeded")):
+        return "节点出站连接超时"
+    if any(token in combined for token in ("connection refused", "actively refused")):
+        return "节点服务器拒绝连接"
+    if any(token in combined for token in ("certificate", "tls handshake", "handshake failed")):
+        return "节点 TLS 握手失败"
+    return f"{type(error).__name__}：检测失败（详情见本机内核日志）"
+
+
 def run_node(
     node: Dict[str, Any],
     index: int,
@@ -74,8 +93,8 @@ def run_node(
         item["success"] = True
         return item
     except Exception as exc:
-        item["error"] = f"{type(exc).__name__}: {exc}"
         item["log_tail"] = tail_text(log_path)
+        item["error"] = friendly_run_error(exc, item["log_tail"])
         return item
     finally:
         if proc is not None:
