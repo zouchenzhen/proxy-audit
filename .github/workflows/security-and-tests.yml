@@ -38,9 +38,30 @@ jobs:
           [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'start-web.ps1'), [ref]$null, [ref]$errors) | Out-Null
           if ($errors.Count) { $errors | Format-List | Out-String | Write-Error }
 
-      - name: Build Docker image
-        shell: bash
-        run: docker build --tag proxy-audit-cloud:test .
-
       - name: Scan full Git history for sensitive material
         run: python scripts/scan_git_history.py
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build Docker image
+        run: docker build --tag proxy-audit-cloud:test .
+
+      - name: Smoke-test Docker image
+        run: |
+          docker run --detach --name proxy-audit-cloud -p 127.0.0.1:17860:7860 proxy-audit-cloud:test
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:17860/api/health; then
+              docker exec proxy-audit-cloud /opt/proxy-audit/third-party/bin/sing-box version
+              docker exec proxy-audit-cloud /opt/proxy-audit/third-party/bin/xray version
+              docker exec proxy-audit-cloud test -s /opt/proxy-audit/third-party/licenses/sing-box-LICENSE
+              docker exec proxy-audit-cloud test -s /opt/proxy-audit/third-party/licenses/xray-LICENSE
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs proxy-audit-cloud
+          exit 1
