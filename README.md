@@ -12,18 +12,17 @@ Windows 11 下的代理节点批量检测工具。目标是从 v2rayN 备份 / �
 
 治理与发布文档：[Security Policy](SECURITY.md) · [第三方许可](THIRD_PARTY_NOTICES.md) · [品牌使用](TRADEMARKS.md) · [公开发布检查清单](docs/PUBLIC_RELEASE_CHECKLIST.md) · [Apache-2.0](LICENSE)
 
-## 在线使用
+## 在线演示（即将上线）
 
-预定在线入口：[https://zouchenzhen-zcz.hf.space](https://zouchenzhen-zcz.hf.space)
+预留入口：[https://zouchenzhen-zcz.hf.space](https://zouchenzhen-zcz.hf.space)
 
-> [!WARNING]
-> 该 Space 的代码已经替换为 Proxy Audit，但仍受 2025 年旧项目遗留的 Hugging Face Abuse
-> 封停影响，当前等待平台人工解除，因此暂时不能开箱使用。恢复后本提示会删除；在此之前
-> 请使用下方本地版。Cloudflare Pages 兼容地址暂不切换，避免把用户导向不可用页面。
+> [!NOTE]
+> 浏览器开箱即用的在线演示版正在准备和平台审核中，暂时还不能使用。入口先保留在这里，
+> 完成部署与真实验收后会尽快开放；当前请使用下方本地版。
 
-无需下载本地引擎。在线页面和检测后端位于同一个 Hugging Face Docker Space：同意隐私
-提示后，每个浏览器标签页会创建一个匿名临时会话，节点、订阅、API Key、任务和结果会
-上传到 HF 后端处理。
+规划中的在线演示无需下载本地引擎。页面和检测后端将位于同一个 Hugging Face Docker
+Space：同意隐私提示后，每个浏览器标签页会创建一个匿名临时会话，节点、订阅、API Key、
+任务和结果会上传到 HF 后端处理。
 
 - 数据只保存在单进程内存和任务期临时文件，不写入数据库或项目历史；会话最长一小时；
 - 到期或点击“立即取消并删除会话”会立即使会话失效并触发取消与清理；已经开始的单次
@@ -33,8 +32,8 @@ Windows 11 下的代理节点批量检测工具。目标是从 v2rayN 备份 / �
 - Hugging Face、订阅服务器、IP 情报商和测试端点仍会处理完成请求所必需的数据。高敏感、
   大批量或需要持久历史的场景请使用下方本地版。
 
-完整边界见[隐私说明](PRIVACY.md)。Cloudflare Pages 的跳转包已经准备好，但会等 HF
-人工解封并完成线上验收后再部署。
+完整边界见[隐私说明](PRIVACY.md)。Cloudflare Pages 的跳转包会等在线演示完成部署和验收
+后再启用，避免把用户导向尚不可用的页面。
 HF 镜像分发的固定版本内核许可证与对应源码归档也通过在线站点的 `/third-party/` 路径提供，
 具体链接见 Space 说明页。
 

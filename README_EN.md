@@ -5,23 +5,22 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![Security and tests](https://github.com/zouchenzhen/proxy-audit/actions/workflows/security-and-tests.yml/badge.svg)](https://github.com/zouchenzhen/proxy-audit/actions/workflows/security-and-tests.yml)
 
-Proxy Audit is a Web UI for batch-testing proxy node connectivity and exit-IP quality. It has an ephemeral Hugging Face edition and a localhost Windows edition. It imports v2rayN backups, databases, subscriptions, and share links; runs real outbound checks through sing-box or Xray; enriches exit IPs with multiple intelligence providers; and presents searchable, filterable results.
+Proxy Audit is a Web UI for batch-testing proxy node connectivity and exit-IP quality. Its localhost Windows edition is available now, and a browser-ready Hugging Face demo is in preparation. It imports v2rayN backups, databases, subscriptions, and share links; runs real outbound checks through sing-box or Xray; enriches exit IPs with multiple intelligence providers; and presents searchable, filterable results.
 
 > [!IMPORTANT]
 > Test only assets that you own, manage, or have explicit permission to test. Follow applicable local laws and third-party service terms. Proxy Audit is not a node provider and does not offer a public proxy service, access-control bypass, or anonymity guarantee.
 
-## Online edition
+## Online demo (coming soon)
 
-Planned entry: [https://zouchenzhen-zcz.hf.space](https://zouchenzhen-zcz.hf.space)
+Reserved entry: [https://zouchenzhen-zcz.hf.space](https://zouchenzhen-zcz.hf.space)
 
-> [!WARNING]
-> The Space repository now contains Proxy Audit, but an abuse suspension inherited from its retired
-> 2025 workload still requires manual Hugging Face review. The hosted app is not yet available; use
-> the local edition until this notice is removed.
+> [!NOTE]
+> The ready-to-use browser demo is being prepared and reviewed by the hosting platform. It is not yet
+> available. This URL is reserved for the upcoming release; use the local edition in the meantime.
 
-No local download is required. The page and audit backend run in the same Hugging Face Docker Space.
-After explicit consent, each browser tab receives an anonymous temporary session and uploads nodes,
-subscriptions, API keys, tasks, and results to the HF backend.
+The planned demo will require no local download. Its page and audit backend will run in the same
+Hugging Face Docker Space. After explicit consent, each browser tab will receive an anonymous
+temporary session and upload nodes, subscriptions, API keys, tasks, and results to the HF backend.
 
 - Proxy Audit keeps that data in one process's memory and task-scoped temporary files, not a database.
 - A session lasts at most one hour. Expiry or manual deletion invalidates it immediately and triggers
