@@ -32,6 +32,7 @@ jobs:
         shell: pwsh
         run: |
           python -m compileall -q scripts tests
+          python scripts/build_pages.py
           node --check web/app.js
           $errors = $null
           [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'start-web.ps1'), [ref]$null, [ref]$errors) | Out-Null

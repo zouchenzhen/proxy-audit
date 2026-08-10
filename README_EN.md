@@ -10,6 +10,23 @@ Proxy Audit is a local Windows application for batch-testing proxy node connecti
 > [!IMPORTANT]
 > Test only assets that you own, manage, or have explicit permission to test. Follow applicable local laws and third-party service terms. Proxy Audit is not a node provider and does not offer a public proxy service, access-control bypass, or anonymity guarantee.
 
+## Online UI
+
+Open: [https://proxy-audit.pages.dev](https://proxy-audit.pages.dev)
+
+Cloudflare Pages serves static HTML, CSS, and JavaScript only. There is no Proxy Audit cloud API,
+database, telemetry, or analytics endpoint receiving your nodes, subscriptions, API keys, or results.
+The full audit still runs in the local engine at `127.0.0.1:8765`, so start `start-web.cmd` on your PC
+first. Chrome or Edge may ask you to allow local-network access when connecting for the first time.
+
+Cloudflare necessarily processes ordinary metadata needed to serve the static page. Subscription
+servers, enabled IP-intelligence providers, and optional probe endpoints still receive the data needed
+to answer their requests; these are not Proxy Audit cloud services.
+
+API keys can be registered on each provider's official website. Free plans are generally sufficient
+for low-volume personal use; current quotas and terms are determined by each provider. Providers that
+do not require a key can also be used directly.
+
 ## Quick start
 
 Windows 11 and Python 3.10+ are recommended.
@@ -75,6 +92,7 @@ python -m pip install -r requirements-dev.txt
 python -m unittest discover -s tests -v
 python scripts/scan_git_history.py
 python tests/ui_browser_acceptance.py
+python tests/ui_online_acceptance.py
 ```
 
 The browser acceptance test launches an isolated local backend and a temporary headless Chrome profile. It exercises settings, import preview, authorization confirmation, partial selection, task history, filtering, themes, and layout checks without touching your normal browser profile.

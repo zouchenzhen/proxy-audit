@@ -5,6 +5,7 @@ import time
 import uuid
 import webbrowser
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import requests
 from flask import Flask, Response, jsonify, request, send_from_directory
@@ -19,6 +20,7 @@ from lib_v2rayn import load_from_input_file, load_from_text, load_from_v2ray_bac
 
 
 manager = TaskManager()
+ONLINE_UI_ORIGINS = {"https://proxy-audit.pages.dev"}
 
 
 def create_app(testing: bool = False) -> Flask:
@@ -26,12 +28,36 @@ def create_app(testing: bool = False) -> Flask:
     app = Flask(__name__, static_folder=str(WEB_DIR), static_url_path="/static")
     app.config.update(MAX_CONTENT_LENGTH=64 * 1024 * 1024, JSON_AS_ASCII=False, TESTING=testing)
 
+    def request_origin_allowed() -> bool:
+        origin = request.headers.get("Origin")
+        if not origin or origin in ONLINE_UI_ORIGINS:
+            return True
+        parsed = urlsplit(origin)
+        return parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost", "::1"}
+
+    @app.before_request
+    def protect_local_api():
+        if not request.path.startswith("/api/"):
+            return None
+        if not request_origin_allowed():
+            return jsonify({"error": "This website is not allowed to access the local Proxy Audit engine"}), 403
+        if request.method == "OPTIONS":
+            return Response(status=204)
+        return None
+
     @app.after_request
     def security_headers(response):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Cache-Control"] = "no-store" if request.path.startswith("/api/") else "no-cache"
+        origin = request.headers.get("Origin")
+        if request.path.startswith("/api/") and origin in ONLINE_UI_ORIGINS:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+            response.headers["Access-Control-Allow-Private-Network"] = "true"
+            response.headers["Vary"] = "Origin"
         return response
 
     @app.errorhandler(413)

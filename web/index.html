@@ -150,6 +150,18 @@
     </main>
   </div>
 
+  <div class="modal-backdrop hidden" id="onlineModeModal">
+    <section class="modal online-mode-modal" role="dialog" aria-modal="true" aria-labelledby="onlineModeTitle">
+      <header><div><span class="eyebrow">LOCAL-FIRST WEB UI</span><h2 id="onlineModeTitle">在线界面，检测仍在本机完成</h2><p>Cloudflare Pages 只提供这份静态 HTML、CSS 和 JavaScript。</p></div></header>
+      <div class="modal-body">
+        <div class="online-privacy-card"><strong>节点、订阅、API Key 和结果不会上传到 Proxy Audit 云端</strong><p>它们只会发送给你电脑上的 <code>127.0.0.1:8765</code> 本地引擎。项目未部署接收这些内容的云端 API、数据库、遥测或分析脚本。</p></div>
+        <ol class="online-steps"><li>先在电脑上启动 Proxy Audit 本地引擎（双击 <code>start-web.cmd</code>）。</li><li>点击下方按钮；Chrome/Edge 如询问“本地网络访问”，请选择允许。</li><li>连接后即可在这个页面导入节点、填写 Key 并检测，数据仍保存在本机。</li></ol>
+        <p class="online-caveat">隐私边界：Cloudflare 会处理加载静态页面所需的常规访问元数据；你启用的订阅服务器、IP 情报商和测试端点仍会收到完成请求所必需的数据。它们不属于 Proxy Audit 云端。</p>
+      </div>
+      <footer><button class="primary" id="connectLocalEngine">连接本地引擎</button></footer>
+    </section>
+  </div>
+
   <div class="modal-backdrop hidden" id="settingsModal">
     <section class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
       <header><div><span class="eyebrow">LOCAL VAULT</span><h2 id="settingsTitle">本机设置</h2><p>Key 仅保存在本机；Windows 使用当前用户 DPAPI 加密。</p></div><button class="icon-button" data-close="settingsModal">×</button></header>

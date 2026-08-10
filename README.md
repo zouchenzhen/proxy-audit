@@ -12,6 +12,23 @@ Windows 11 下的代理节点批量检测工具。目标是从 v2rayN 备份 / �
 
 治理与发布文档：[Security Policy](SECURITY.md) · [第三方许可](THIRD_PARTY_NOTICES.md) · [品牌使用](TRADEMARKS.md) · [公开发布检查清单](docs/PUBLIC_RELEASE_CHECKLIST.md) · [Apache-2.0](LICENSE)
 
+## 在线使用
+
+在线界面：[https://proxy-audit.pages.dev](https://proxy-audit.pages.dev)
+
+在线地址由 Cloudflare Pages 托管，但只提供静态 HTML、CSS 和 JavaScript，没有接收节点、
+订阅、API Key 或检测结果的云端 API、数据库和遥测。完整检测仍由用户电脑上的
+`127.0.0.1:8765` 本地引擎执行，数据保存在本机；首次连接时 Chrome/Edge 可能要求允许
+该网站访问本地网络。
+
+> 在线界面不是“云端代跑”：使用前仍需在本机双击 `start-web.cmd` 启动检测内核。
+> Cloudflare 会处理加载静态页面所需的常规访问元数据；订阅服务器、启用的 IP 情报商和
+> 测试端点仍会收到完成请求所必需的数据，但节点、Key 和结果不会上传到 Proxy Audit 云端。
+
+IPinfo、IP2Location、IPQualityScore、Scamalytics、AbuseIPDB 等服务的 Key 可在各自官网
+自行注册获取。它们的免费额度通常已经足够个人低频检测；具体额度和条款以服务商官网
+当前说明为准。无需 Key 的情报源也可以直接使用。
+
 ## Web UI（推荐）
 
 克隆后双击项目根目录的 `start-web.cmd` 即可。首次启动会自动创建 `.venv`、安装 Python 依赖，并在缺少检测内核时从 sing-box 官方发行页下载经过 SHA256 校验的固定版本：
@@ -96,6 +113,7 @@ python -m pip install -r requirements-dev.txt
 python -m unittest discover -s tests -v
 python scripts/scan_git_history.py
 python tests/ui_browser_acceptance.py
+python tests/ui_online_acceptance.py
 python tests/real_local_acceptance.py --db "E:\\path\\to\\v2rayN\\guiConfigs\\guiNDB.db"
 ```
 

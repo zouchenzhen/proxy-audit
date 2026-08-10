@@ -19,6 +19,8 @@ const UI_THEME_KEY = "proxyAudit.theme";
 const UI_FONT_KEY = "proxyAudit.fontSize";
 const SESSION_IMPORT_KEY = "proxyAudit.currentImport";
 const SESSION_TASK_KEY = "proxyAudit.currentTask";
+const LOCAL_API_ORIGIN = "http://127.0.0.1:8765";
+const IS_LOCAL_UI = ["127.0.0.1", "localhost", "::1"].includes(location.hostname);
 
 function migrateLegacyStorage() {
   [
@@ -48,7 +50,9 @@ function escapeHtml(value) {
 }
 
 async function api(path, options = {}) {
-  const response = await fetch(path, options);
+  const requestOptions = {...options};
+  if (!IS_LOCAL_UI) requestOptions.targetAddressSpace = "loopback";
+  const response = await fetch(`${IS_LOCAL_UI ? "" : LOCAL_API_ORIGIN}${path}`, requestOptions);
   let data;
   try { data = await response.json(); } catch { data = { error: await response.text() }; }
   if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
@@ -127,10 +131,12 @@ async function loadSystem() {
     renderProviders();
     renderServices();
     renderSettings();
+    return true;
   } catch (error) {
     $(".health-pill").classList.add("error");
     $("#healthText").textContent = "本地引擎连接失败";
     toast(error.message, "error");
+    return false;
   }
 }
 
@@ -584,9 +590,47 @@ function populateProtocolFilter(protocols) {
   if (protocols.includes(current)) $("#protocolFilter").value = current;
 }
 
-function exportCurrent(format) {
+async function exportCurrent(format) {
   if (!state.currentTask) return;
-  window.location.href = `/api/tasks/${state.currentTask.id}/export?format=${format}`;
+  const path = `/api/tasks/${state.currentTask.id}/export?format=${format}`;
+  if (IS_LOCAL_UI) {
+    window.location.href = path;
+    return;
+  }
+  try {
+    const response = await fetch(`${LOCAL_API_ORIGIN}${path}`, {targetAddressSpace:"loopback"});
+    if (!response.ok) throw new Error(`导出失败：HTTP ${response.status}`);
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `proxy-audit-${state.currentTask.id}.${format === "md" ? "md" : format}`;
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch (error) { toast(error.message, "error"); }
+}
+
+async function initializeConnectedApp() {
+  const connected = await loadSystem();
+  if (!connected) return false;
+  await loadHistory();
+  await restoreSession();
+  return true;
+}
+
+function setupOnlineMode() {
+  document.body.classList.add("online-ui");
+  $("#healthText").textContent = "在线界面 · 等待本地引擎";
+  openModal("onlineModeModal");
+  $("#connectLocalEngine").addEventListener("click", async () => {
+    const button = $("#connectLocalEngine");
+    button.disabled = true;
+    button.textContent = "正在连接…";
+    const connected = await initializeConnectedApp();
+    button.disabled = false;
+    button.textContent = connected ? "已连接本地引擎" : "重新连接本地引擎";
+    if (connected) closeModal("onlineModeModal");
+  });
 }
 
 function openModal(id) {
@@ -643,9 +687,11 @@ async function boot() {
   migrateLegacyStorage();
   applyPreferences();
   bindEvents();
-  await loadSystem();
-  await loadHistory();
-  await restoreSession();
+  if (!IS_LOCAL_UI) {
+    setupOnlineMode();
+    return;
+  }
+  await initializeConnectedApp();
 }
 
 boot();

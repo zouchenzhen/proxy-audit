@@ -280,6 +280,15 @@ tbody tr:hover { background: #10161e; }
 .vault-note { padding:10px;border:1px solid rgba(83,215,255,.13);border-radius:8px;background:rgba(83,215,255,.035);color:#86a9b8;font-size:9px;line-height:1.55; }
 .detail-modal { width:min(820px,92vw); }
 .rename-modal { width:min(520px,92vw); }
+.online-mode-modal { width:min(620px,92vw); }
+.online-mode-modal footer button { width:180px;min-height:48px;padding:0 18px; }
+.online-privacy-card { padding:14px 16px;border:1px solid rgba(78,227,154,.28);border-radius:10px;background:rgba(78,227,154,.055); }
+.online-privacy-card strong { color:var(--green);font-size:calc(12px + var(--font-boost)); }
+.online-privacy-card p,.online-caveat,.online-steps { color:var(--muted);font-size:calc(10px + var(--font-boost));line-height:1.65; }
+.online-privacy-card p { margin:7px 0 0; }
+.online-steps { margin:16px 0;padding-left:24px; }
+.online-steps li+li { margin-top:6px; }
+.online-caveat { margin:0;padding:11px 13px;border-left:3px solid var(--amber);background:rgba(255,189,74,.045); }
 .rename-field span { display:block;margin-bottom:7px;color:var(--muted);font-size:calc(10px + var(--font-boost)); }
 .detail-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:8px; }
 .detail-stat { padding:11px;border:1px solid var(--line-soft);border-radius:8px;background:#0a0e13; }

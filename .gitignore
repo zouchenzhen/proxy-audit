@@ -29,6 +29,9 @@ venv/
 .idea/
 .vscode/
 .pytest_cache/
+node_modules/
+.wrangler/
+pages-dist/
 
 # OS artifacts
 Thumbs.db

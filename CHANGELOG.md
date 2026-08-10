@@ -3,6 +3,7 @@
 ## 2026-08-10
 
 ### Web UI 2.2 · 公开发布准备
+- 新增 Cloudflare Pages 静态在线入口；节点、订阅、Key 和结果只连接本机引擎，不设云端业务 API
 - 项目对外名称统一为 Proxy Audit，与 GitHub 仓库名 `proxy-audit` 保持一致
 - 项目自有代码采用 Apache License 2.0，并加入 NOTICE 与第三方许可证清单
 - 新增简洁中性的负责任使用、隐私、安全政策和公开发布检查清单

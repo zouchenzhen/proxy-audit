@@ -71,6 +71,8 @@ class CDP:
         self.ws = websocket.create_connection(url, timeout=8, origin="http://localhost")
         self.next_id = 0
         self.exceptions = []
+        self.network_failures = []
+        self.log_entries = []
 
     def call(self, method, params=None):
         self.next_id += 1
@@ -81,6 +83,16 @@ class CDP:
             if message.get("method") == "Runtime.exceptionThrown":
                 details = message.get("params", {}).get("exceptionDetails", {})
                 self.exceptions.append(details.get("text") or "JavaScript exception")
+            if message.get("method") == "Network.loadingFailed":
+                params = message.get("params", {})
+                self.network_failures.append({
+                    "errorText": params.get("errorText"),
+                    "blockedReason": params.get("blockedReason"),
+                    "corsErrorStatus": params.get("corsErrorStatus"),
+                })
+            if message.get("method") == "Log.entryAdded":
+                entry = message.get("params", {}).get("entry", {})
+                self.log_entries.append({"level": entry.get("level"), "text": entry.get("text")})
             if message.get("id") == call_id:
                 if "error" in message:
                     raise RuntimeError(f"CDP {method}: {message['error']}")
