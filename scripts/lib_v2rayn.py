@@ -142,27 +142,65 @@ def load_from_v2ray_db(db_path: str) -> List[Dict[str, Any]]:
     return _read_sqlite_nodes(p, 'v2ray_db', p.name)
 
 
-def extract_backup_and_get_db(zip_path: str) -> Path:
+def extract_backup_and_get_db(
+    zip_path: str,
+    *,
+    extract_dir: Optional[Path] = None,
+    max_files: Optional[int] = None,
+    max_uncompressed_bytes: Optional[int] = None,
+) -> Path:
     zip_p = Path(zip_path)
-    target = TEMP_DIR / 'backup_extract'
+    target = Path(extract_dir) if extract_dir is not None else TEMP_DIR / 'backup_extract'
     if target.exists():
         shutil.rmtree(target)
     target.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(zip_p, 'r') as zf:
         target_root = target.resolve()
-        for member in zf.infolist():
+        members = [member for member in zf.infolist() if not member.is_dir()]
+        if max_files is not None and len(members) > max_files:
+            raise ValueError(f'Backup ZIP contains more than {max_files} files')
+        declared_size = sum(max(0, member.file_size) for member in members)
+        if max_uncompressed_bytes is not None and declared_size > max_uncompressed_bytes:
+            raise ValueError('Backup ZIP expands beyond the cloud safety limit')
+        total_written = 0
+        for member in members:
             destination = (target / member.filename).resolve()
             if target_root != destination and target_root not in destination.parents:
                 raise ValueError(f'Unsafe path in backup ZIP: {member.filename}')
-        zf.extractall(target)
+            if member.flag_bits & 0x1:
+                raise ValueError('Encrypted backup ZIP files are not supported')
+            unix_mode = (member.external_attr >> 16) & 0xFFFF
+            if unix_mode and (unix_mode & 0o170000) == 0o120000:
+                raise ValueError(f'Symbolic links are not allowed in backup ZIP: {member.filename}')
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with zf.open(member, 'r') as source, destination.open('wb') as output:
+                while True:
+                    chunk = source.read(64 * 1024)
+                    if not chunk:
+                        break
+                    total_written += len(chunk)
+                    if max_uncompressed_bytes is not None and total_written > max_uncompressed_bytes:
+                        raise ValueError('Backup ZIP expands beyond the cloud safety limit')
+                    output.write(chunk)
     candidates = list(target.rglob('guiNDB.db'))
     if not candidates:
         raise FileNotFoundError('guiNDB.db not found inside backup zip')
     return candidates[0]
 
 
-def load_from_v2ray_backup(zip_path: str) -> List[Dict[str, Any]]:
-    db_path = extract_backup_and_get_db(zip_path)
+def load_from_v2ray_backup(
+    zip_path: str,
+    *,
+    extract_dir: Optional[Path] = None,
+    max_files: Optional[int] = None,
+    max_uncompressed_bytes: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    db_path = extract_backup_and_get_db(
+        zip_path,
+        extract_dir=extract_dir,
+        max_files=max_files,
+        max_uncompressed_bytes=max_uncompressed_bytes,
+    )
     return _read_sqlite_nodes(db_path, 'v2ray_backup', Path(zip_path).name)
 
 
@@ -361,6 +399,7 @@ def filter_nodes(nodes: List[Dict[str, Any]], filter_substring: str = '', protoc
     for node in nodes:
         hay = ' | '.join([
             str(node.get('remark') or ''),
+            str(node.get('_display_server') or ''),
             str(node.get('server') or ''),
             str(node.get('subscription_name') or ''),
             str(node.get('source_name') or ''),

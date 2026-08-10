@@ -3,8 +3,8 @@
 ## Supported version
 
 Security fixes target the latest commit on the default branch. Old commits, unofficial packages,
-forks, modified detection cores, public deployments and third-party services are not maintained by
-this project.
+forks, modified detection cores, unofficial public deployments and third-party services are not
+maintained by this project.
 
 ## Reporting a vulnerability
 
@@ -19,16 +19,19 @@ bounty commitment is made.
 
 ## Security boundaries
 
-- The Web UI must remain bound to `127.0.0.1`/localhost. It has no authentication layer and is not a
-  production WSGI service.
+- The local Web UI must remain bound to `127.0.0.1`/localhost. It has no authentication layer and is
+  not a production WSGI service.
+- The official HF edition uses high-entropy sessions, a one-hour maximum lifetime, strict node and
+  concurrency quotas, public-address-only targets, pinned DNS resolution, upload/ZIP limits,
+  same-origin API checks and one WSGI process. Do not remove those controls from a public deployment.
 - Only test nodes you own or are explicitly authorized to test.
 - Node links and archives are untrusted input. Keep the project and generated files in a restricted
   local directory and use an unprivileged Windows account.
 - Saved API keys use Windows DPAPI for the current user. Legacy `config.local.json` is plaintext.
 - Temporary core configurations are deleted after a task, but crash dumps, backups, endpoint logs,
   antivirus products or privileged local software may still retain data.
-- Downloaded sing-box archives are pinned and SHA256-verified. Xray is user-supplied or discovered
-  locally. Do not replace either binary with an untrusted build.
+- Downloaded or distributed core archives are pinned and SHA256-verified. Do not replace either
+  binary with an untrusted build.
 - Never expose this local panel using port forwarding, reverse proxies, Cloudflare Tunnel, ngrok or
   similar tooling without first adding authentication, authorization, TLS, CSRF protection, rate
   limits, audit logging and a complete deployment security review.

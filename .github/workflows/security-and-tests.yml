@@ -38,5 +38,9 @@ jobs:
           [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'start-web.ps1'), [ref]$null, [ref]$errors) | Out-Null
           if ($errors.Count) { $errors | Format-List | Out-String | Write-Error }
 
+      - name: Build Docker image
+        shell: bash
+        run: docker build --tag proxy-audit-cloud:test .
+
       - name: Scan full Git history for sensitive material
         run: python scripts/scan_git_history.py

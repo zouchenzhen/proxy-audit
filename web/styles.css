@@ -289,6 +289,10 @@ tbody tr:hover { background: #10161e; }
 .online-steps { margin:16px 0;padding-left:24px; }
 .online-steps li+li { margin-top:6px; }
 .online-caveat { margin:0;padding:11px 13px;border-left:3px solid var(--amber);background:rgba(255,189,74,.045); }
+.cloud-only,.cloud-copy { display:none; }
+.online-ui .cloud-only,.online-ui .cloud-copy { display:inline-flex; }
+.online-ui .local-copy { display:none; }
+.button-link { display:inline-flex;align-items:center;justify-content:center;text-decoration:none; }
 .rename-field span { display:block;margin-bottom:7px;color:var(--muted);font-size:calc(10px + var(--font-boost)); }
 .detail-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:8px; }
 .detail-stat { padding:11px;border:1px solid var(--line-soft);border-radius:8px;background:#0a0e13; }

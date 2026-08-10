@@ -118,7 +118,7 @@ def _get_json(session: requests.Session, url: str, timeout: int, headers=None, p
 
 
 def fetch_ipinfo(ip: str, timeout: int = 15, cfg=None) -> Dict[str, Any]:
-    cfg = cfg or load_local_config()
+    cfg = load_local_config() if cfg is None else cfg
     session = _session_with_socks()
     return _request_with_key_pool(
         "ipinfo_api_key",
@@ -129,7 +129,7 @@ def fetch_ipinfo(ip: str, timeout: int = 15, cfg=None) -> Dict[str, Any]:
 
 
 def fetch_ip2location(ip: str, timeout: int = 15, cfg=None) -> Dict[str, Any]:
-    cfg = cfg or load_local_config()
+    cfg = load_local_config() if cfg is None else cfg
     session = _session_with_socks()
     return _request_with_key_pool(
         "ip2location_api_key",
@@ -140,7 +140,7 @@ def fetch_ip2location(ip: str, timeout: int = 15, cfg=None) -> Dict[str, Any]:
 
 
 def fetch_ipqs(ip: str, timeout: int = 15, cfg=None) -> Dict[str, Any]:
-    cfg = cfg or load_local_config()
+    cfg = load_local_config() if cfg is None else cfg
     session = _session_with_socks()
     return _request_with_key_pool(
         "ipqs_api_key",
@@ -151,7 +151,7 @@ def fetch_ipqs(ip: str, timeout: int = 15, cfg=None) -> Dict[str, Any]:
 
 
 def fetch_scamalytics(ip: str, timeout: int = 15, cfg=None) -> Dict[str, Any]:
-    cfg = cfg or load_local_config()
+    cfg = load_local_config() if cfg is None else cfg
     user = cfg.get("scamalytics_user")
     headers = {"Accept": "application/json,text/plain,*/*"}
     session = _session_with_socks()
@@ -170,7 +170,7 @@ def fetch_ipapi_is(ip: str, timeout: int = 15, cfg=None) -> Dict[str, Any]:
 
 
 def fetch_abuseipdb(ip: str, timeout: int = 15, cfg=None) -> Dict[str, Any]:
-    cfg = cfg or load_local_config()
+    cfg = load_local_config() if cfg is None else cfg
     session = _session_with_socks()
     data = _request_with_key_pool(
         "abuseipdb_api_key",
@@ -263,8 +263,8 @@ def build_unified_profile(exit_ip, ip_api, ipinfo, ip2location, ipqs, scamalytic
     }
 
 
-def enrich_ip_profile(exit_ip: str, timeout: int = 15, sleep_sec: float = 0.0, cfg=None, providers=None) -> Dict[str, Any]:
-    cfg = cfg or load_local_config()
+def enrich_ip_profile(exit_ip: str, timeout: int = 15, sleep_sec: float = 0.0, cfg=None, providers=None, cancel_event=None) -> Dict[str, Any]:
+    cfg = load_local_config() if cfg is None else cfg
     providers = list(providers or DEFAULT_PROVIDERS)
     fetchers = {
         "ipinfo": fetch_ipinfo,
@@ -277,6 +277,9 @@ def enrich_ip_profile(exit_ip: str, timeout: int = 15, sleep_sec: float = 0.0, c
     out = {key: {} for key in fetchers}
     out["errors"] = {}
     for key in providers:
+        if cancel_event is not None and cancel_event.is_set():
+            out["errors"]["cancelled"] = True
+            break
         fn = fetchers.get(key)
         if not fn:
             continue
@@ -291,10 +294,13 @@ def enrich_ip_profile(exit_ip: str, timeout: int = 15, sleep_sec: float = 0.0, c
     return out
 
 
-def probe_quality(session: requests.Session, timeout: int, samples: int = 2) -> Dict[str, Any]:
+def probe_quality(session: requests.Session, timeout: int, samples: int = 2, cancel_event=None) -> Dict[str, Any]:
     latencies: List[float] = []
     errors = []
     for _ in range(max(0, min(samples, 5))):
+        if cancel_event is not None and cancel_event.is_set():
+            errors.append("Cancelled")
+            break
         started = time.perf_counter()
         try:
             response = session.get("https://www.gstatic.com/generate_204", timeout=timeout)
@@ -312,9 +318,11 @@ def probe_quality(session: requests.Session, timeout: int, samples: int = 2) -> 
     }
 
 
-def probe_services(session: requests.Session, timeout: int, targets=None) -> Dict[str, Any]:
+def probe_services(session: requests.Session, timeout: int, targets=None, cancel_event=None) -> Dict[str, Any]:
     output = {}
     for target in targets or []:
+        if cancel_event is not None and cancel_event.is_set():
+            break
         if target not in SERVICE_TARGETS:
             continue
         name, url = SERVICE_TARGETS[target]
@@ -333,10 +341,20 @@ def probe_services(session: requests.Session, timeout: int, targets=None) -> Dic
     return output
 
 
-def probe_ip_via_socks(socks_port: int, timeout: int = 15, providers=None, service_targets=None, quality_samples: int = 2) -> dict:
-    cfg = load_local_config()
+def probe_ip_via_socks(
+    socks_port: int,
+    timeout: int = 15,
+    providers=None,
+    service_targets=None,
+    quality_samples: int = 2,
+    cfg=None,
+    cancel_event=None,
+) -> dict:
+    cfg = cfg if cfg is not None else load_local_config()
     selected = list(providers or DEFAULT_PROVIDERS)
     session = _session_with_socks(socks_port)
+    if cancel_event is not None and cancel_event.is_set():
+        raise InterruptedError("Task cancelled")
     started = time.perf_counter()
     ip_data = _get_json(session, "https://api.ipify.org?format=json", timeout)
     ipify_ms = round((time.perf_counter() - started) * 1000, 1)
@@ -352,7 +370,14 @@ def probe_ip_via_socks(socks_port: int, timeout: int = 15, providers=None, servi
             )
         except Exception as exc:
             intel_errors["ip_api"] = f"{type(exc).__name__}: {exc}"
-    enrich = enrich_ip_profile(ip, timeout=timeout, sleep_sec=0.08, cfg=cfg, providers=selected)
+    enrich = enrich_ip_profile(
+        ip,
+        timeout=timeout,
+        sleep_sec=0.08,
+        cfg=cfg,
+        providers=selected,
+        cancel_event=cancel_event,
+    )
     intel_errors.update(enrich.get("errors") or {})
     unified = build_unified_profile(
         ip,
@@ -376,6 +401,6 @@ def probe_ip_via_socks(socks_port: int, timeout: int = 15, providers=None, servi
         "abuseipdb": enrich.get("abuseipdb"),
         "intel_errors": intel_errors,
         "unified": unified,
-        "quality": probe_quality(session, timeout, quality_samples),
-        "services": probe_services(session, timeout, service_targets),
+        "quality": probe_quality(session, timeout, quality_samples, cancel_event),
+        "services": probe_services(session, timeout, service_targets, cancel_event),
     }

@@ -7,17 +7,18 @@
 
 | 组件 | 本项目中的关系 | 上游许可证 |
 |---|---|---|
-| [SagerNet/sing-box](https://github.com/SagerNet/sing-box) | 未提交到 Git；首次启动可从上游 Release 独立下载固定版本 1.13.3，并校验 SHA256；以独立子进程运行 | GPL-3.0-or-later；以其上游 `LICENSE` 为准 |
-| [XTLS/Xray-core](https://github.com/XTLS/Xray-core) | 未提交、未自动分发；仅在用户自行安装或从 v2rayN 中发现后，以独立子进程运行 | MPL-2.0；以其上游 `LICENSE` 为准 |
+| [SagerNet/sing-box](https://github.com/SagerNet/sing-box) | 不提交二进制到 Git；本地启动可下载固定版本 1.13.3；HF 镜像分发 1.13.3 Linux 构建、上游许可证和对应源码归档；均校验 SHA256 并以独立子进程运行 | GPL-3.0-or-later；以上游 `LICENSE` 为准 |
+| [XTLS/Xray-core](https://github.com/XTLS/Xray-core) | 不提交二进制到 Git；本地版由用户提供/自动发现；HF 镜像分发 26.3.27 Linux 构建、上游许可证和对应源码归档；校验 SHA256 并以独立子进程运行 | MPL-2.0；以上游 `LICENSE` 为准 |
 
-本仓库的 Apache-2.0 不覆盖上述内核。仅从源码克隆本仓库时不会从 Git 获得这些
-二进制。如果重新打包、镜像或随产品分发内核，分发者必须自行履行相应许可证义务，
-包括但不限于保留许可证/版权声明以及 GPL 场景下适用的完整对应源码义务。
+本仓库的 Apache-2.0 不覆盖上述内核。仅从源码克隆本仓库时不会从 Git 获得二进制。
+官方 HF 镜像在 `/opt/proxy-audit/third-party/` 保留许可证及对应固定版本源码归档。其他
+重新打包、镜像或分发者仍须自行履行相应许可证义务。
 
 ## Python 运行时依赖
 
-`requirements.txt` 的直接依赖为 Flask（BSD-3-Clause）与 Requests
-（Apache-2.0）；Requests 的 SOCKS 支持使用 PySocks（BSD-3-Clause）。安装时还会解析
+`requirements.txt` 的直接依赖为 Flask（BSD-3-Clause）与 Requests（Apache-2.0）；
+`requirements-cloud.txt` 另加入 Gunicorn（MIT）。Requests 的 SOCKS 支持使用 PySocks
+（BSD-3-Clause）。安装时还会解析
 下列传递依赖。具体版本由安装时间和版本范围决定，重新分发环境时应以实际安装包内
 的元数据和许可证文件为准。
 

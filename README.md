@@ -14,22 +14,39 @@ Windows 11 下的代理节点批量检测工具。目标是从 v2rayN 备份 / �
 
 ## 在线使用
 
-在线界面：[https://proxy-audit.pages.dev](https://proxy-audit.pages.dev)
+预定在线入口：[https://zouchenzhen-zcz.hf.space](https://zouchenzhen-zcz.hf.space)
 
-在线地址由 Cloudflare Pages 托管，但只提供静态 HTML、CSS 和 JavaScript，没有接收节点、
-订阅、API Key 或检测结果的云端 API、数据库和遥测。完整检测仍由用户电脑上的
-`127.0.0.1:8765` 本地引擎执行，数据保存在本机；首次连接时 Chrome/Edge 可能要求允许
-该网站访问本地网络。
+> [!WARNING]
+> 该 Space 的代码已经替换为 Proxy Audit，但仍受 2025 年旧项目遗留的 Hugging Face Abuse
+> 封停影响，当前等待平台人工解除，因此暂时不能开箱使用。恢复后本提示会删除；在此之前
+> 请使用下方本地版。Cloudflare Pages 兼容地址暂不切换，避免把用户导向不可用页面。
 
-> 在线界面不是“云端代跑”：使用前仍需在本机双击 `start-web.cmd` 启动检测内核。
-> Cloudflare 会处理加载静态页面所需的常规访问元数据；订阅服务器、启用的 IP 情报商和
-> 测试端点仍会收到完成请求所必需的数据，但节点、Key 和结果不会上传到 Proxy Audit 云端。
+无需下载本地引擎。在线页面和检测后端位于同一个 Hugging Face Docker Space：同意隐私
+提示后，每个浏览器标签页会创建一个匿名临时会话，节点、订阅、API Key、任务和结果会
+上传到 HF 后端处理。
+
+- 数据只保存在单进程内存和任务期临时文件，不写入数据库或项目历史；会话最长一小时；
+- 到期或点击“立即取消并删除会话”会立即使会话失效并触发取消与清理；已经开始的单次
+  网络请求可能等待最长 12 秒超时后释放；
+- Space 重启、休眠或重新部署会丢失所有会话，请检测结束后立即导出；
+- 每次导入/单任务最多 20 个节点、并发最多 2、同一网络每日最多 100 个节点；
+- Hugging Face、订阅服务器、IP 情报商和测试端点仍会处理完成请求所必需的数据。高敏感、
+  大批量或需要持久历史的场景请使用下方本地版。
+
+完整边界见[隐私说明](PRIVACY.md)。Cloudflare Pages 的跳转包已经准备好，但会等 HF
+人工解封并完成线上验收后再部署。
+HF 镜像分发的固定版本内核许可证与对应源码归档也通过在线站点的 `/third-party/` 路径提供，
+具体链接见 Space 说明页。
+
+> HF 费用说明：PRO 是实际付费订阅（当前官方标价 US$9/月）并会续费；仅绑定银行卡或
+> 完成 0 元支付验证不会免费获得 PRO。这个部署保留现有 `cpu-basic` 免费硬件，不启用
+> 付费升级；免费 Space 当前在连续约 48 小时无访问后会休眠，之后访问会触发冷启动。
 
 IPinfo、IP2Location、IPQualityScore、Scamalytics、AbuseIPDB 等服务的 Key 可在各自官网
 自行注册获取。它们的免费额度通常已经足够个人低频检测；具体额度和条款以服务商官网
 当前说明为准。无需 Key 的情报源也可以直接使用。
 
-## Web UI（推荐）
+## 本地 Web UI（高敏感/大批量推荐）
 
 克隆后双击项目根目录的 `start-web.cmd` 即可。首次启动会自动创建 `.venv`、安装 Python 依赖，并在缺少检测内核时从 sing-box 官方发行页下载经过 SHA256 校验的固定版本：
 
@@ -48,7 +65,8 @@ cd proxy-audit
 
 浏览器会打开 `http://127.0.0.1:8765`。面板只监听本机，不对局域网或公网开放。
 
-Web UI 现已支持：
+云端版与本地版共用主要界面功能；本地版另提供加密持久 Key、最多一万节点导入和最近
+任务历史。Web UI 现已支持：
 
 - 粘贴分享链接、Base64 订阅正文、订阅 URL、TXT、v2rayN 备份 ZIP、`guiNDB.db`
 - 自动解析 VLESS、VMess、Trojan、Shadowsocks、Hysteria2、TUIC、AnyTLS
@@ -113,7 +131,7 @@ python -m pip install -r requirements-dev.txt
 python -m unittest discover -s tests -v
 python scripts/scan_git_history.py
 python tests/ui_browser_acceptance.py
-python tests/ui_online_acceptance.py
+python tests/ui_online_acceptance.py --url "https://zouchenzhen-zcz.hf.space/"
 python tests/real_local_acceptance.py --db "E:\\path\\to\\v2rayN\\guiConfigs\\guiNDB.db"
 ```
 

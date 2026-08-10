@@ -1,0 +1,17 @@
+.git
+.github
+.venv
+.wrangler
+__pycache__
+*.py[cod]
+bin
+cloudflare
+input
+pages-dist
+results
+temp
+tests
+config.local.json
+config.secure.json
+docs/assets
+requirements-dev.txt

@@ -19,8 +19,9 @@ const UI_THEME_KEY = "proxyAudit.theme";
 const UI_FONT_KEY = "proxyAudit.fontSize";
 const SESSION_IMPORT_KEY = "proxyAudit.currentImport";
 const SESSION_TASK_KEY = "proxyAudit.currentTask";
-const LOCAL_API_ORIGIN = "http://127.0.0.1:8765";
+const CLOUD_SESSION_KEY = "proxyAudit.cloudSession";
 const IS_LOCAL_UI = ["127.0.0.1", "localhost", "::1"].includes(location.hostname);
+const IS_CLOUD_UI = !IS_LOCAL_UI || new URLSearchParams(location.search).get("cloud") === "1";
 
 function migrateLegacyStorage() {
   [
@@ -51,8 +52,10 @@ function escapeHtml(value) {
 
 async function api(path, options = {}) {
   const requestOptions = {...options};
-  if (!IS_LOCAL_UI) requestOptions.targetAddressSpace = "loopback";
-  const response = await fetch(`${IS_LOCAL_UI ? "" : LOCAL_API_ORIGIN}${path}`, requestOptions);
+  requestOptions.headers = {...(options.headers || {})};
+  const cloudToken = sessionStorage.getItem(CLOUD_SESSION_KEY);
+  if (IS_CLOUD_UI && cloudToken) requestOptions.headers["X-Proxy-Audit-Session"] = cloudToken;
+  const response = await fetch(path, requestOptions);
   let data;
   try { data = await response.json(); } catch { data = { error: await response.text() }; }
   if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
@@ -124,17 +127,24 @@ async function loadSystem() {
   try {
     state.system = await api("/api/system");
     $(".health-pill").classList.add("ok");
-    $("#healthText").textContent = "本地引擎已连接";
+    $("#healthText").textContent = IS_CLOUD_UI ? "云端临时会话已连接" : "本地引擎已连接";
     $("#timeout").value = state.system.settings.default_timeout;
     $("#concurrency").value = state.system.settings.default_concurrency;
     renderKernels();
     renderProviders();
     renderServices();
     renderSettings();
+    if (IS_CLOUD_UI) {
+      $("#concurrency").max = state.system.limits.max_concurrency;
+      $("#timeout").max = 12;
+      $("#nodeLimit").max = state.system.limits.max_nodes_per_task;
+      $("#uploadLimitHint").textContent = "TXT / ZIP / guiNDB.db · 最大 4 MB；每次最多 20 节点";
+      $("#keyLimitHelp").textContent = `每个服务商可加入多个 Key（每行一个，本次会话最多 ${state.system.limits.max_keys_per_provider} 个）。后台会轮询使用，鉴权失败或额度受限时自动切换下一枚。`;
+    }
     return true;
   } catch (error) {
     $(".health-pill").classList.add("error");
-    $("#healthText").textContent = "本地引擎连接失败";
+    $("#healthText").textContent = IS_CLOUD_UI ? "云端临时会话连接失败" : "本地引擎连接失败";
     toast(error.message, "error");
     return false;
   }
@@ -223,7 +233,9 @@ function renderSettings() {
   $("#settingXray").value = settings.xray_path || "";
   $("#settingHistoryLimit").value = settings.history_limit || 10;
   applyPreferences(localStorage.getItem(UI_THEME_KEY) || "dark", localStorage.getItem(UI_FONT_KEY) || "large");
-  $("#vaultNote").textContent = `存储方式：${settings.storage}。服务端绝不回传完整 Key；小眼睛只显示用于辨认的短前缀。${settings.legacy_config_detected ? "检测到旧版 config.local.json；新保存值会优先使用加密配置。" : ""}`;
+  $("#vaultNote").textContent = IS_CLOUD_UI
+    ? `存储方式：${settings.storage}。完整 Key 会上传到临时检测后端，但不会回传页面或写入结果；最长 1 小时后删除。小眼睛只显示短前缀。`
+    : `存储方式：${settings.storage}。服务端绝不回传完整 Key；小眼睛只显示用于辨认的短前缀。${settings.legacy_config_detected ? "检测到旧版 config.local.json；新保存值会优先使用加密配置。" : ""}`;
 }
 
 async function saveSettings() {
@@ -234,11 +246,11 @@ async function saveSettings() {
       ? input.value.split(/[\r\n,;]+/).map(value => value.trim()).filter(Boolean)
       : input.value.trim();
   });
-  if ($("#settingSingbox").value.trim()) updates.singbox_path = $("#settingSingbox").value.trim();
-  if ($("#settingXray").value.trim()) updates.xray_path = $("#settingXray").value.trim();
+  if (IS_LOCAL_UI && $("#settingSingbox").value.trim()) updates.singbox_path = $("#settingSingbox").value.trim();
+  if (IS_LOCAL_UI && $("#settingXray").value.trim()) updates.xray_path = $("#settingXray").value.trim();
   updates.default_timeout = Number($("#timeout").value || 15);
   updates.default_concurrency = Number($("#concurrency").value || 2);
-  updates.history_limit = Math.max(1, Math.min(Number($("#settingHistoryLimit").value || 10), 100));
+  if (IS_LOCAL_UI) updates.history_limit = Math.max(1, Math.min(Number($("#settingHistoryLimit").value || 10), 100));
   applyPreferences($("#themeSelect").value, $("#fontSizeSelect").value);
   const clear_fields = $$('[data-clear]:checked').map(input => input.dataset.clear);
   const remove_key_ids = Object.fromEntries(Object.entries(state.pendingKeyRemovals).map(([field, values]) => [field, [...values]]));
@@ -248,7 +260,7 @@ async function saveSettings() {
     closeModal("settingsModal");
     await loadSystem();
     await loadHistory();
-    toast("设置已在本机加密保存", "success");
+    toast(IS_CLOUD_UI ? "Key 已加入本次云端临时会话" : "设置已在本机加密保存", "success");
   } catch (error) { toast(error.message, "error"); }
 }
 
@@ -519,7 +531,7 @@ async function loadHistory() {
     const data = await api("/api/tasks");
     state.tasks = data.tasks || [];
     $("#historyCount").textContent = `显示 ${state.tasks.length}/${state.system?.settings?.history_limit || 10} 条`;
-    $("#historyList").innerHTML = state.tasks.length ? state.tasks.map(task => `<div class="history-item ${state.currentTask?.id === task.id ? "active" : ""}" data-task-id="${escapeHtml(task.id)}"><div><strong>${escapeHtml(task.name || `${task.kernel} · ${task.source_label}`)}</strong><small>${task.completed}/${task.total} · ${formatTime(task.created_at)}</small></div><div class="history-actions"><b>${escapeHtml(task.status)}</b><button type="button" data-rename-task="${escapeHtml(task.id)}" title="重命名任务" aria-label="重命名任务">✎</button></div></div>`).join("") : '<p class="muted-copy">本机尚无任务记录</p>';
+    $("#historyList").innerHTML = state.tasks.length ? state.tasks.map(task => `<div class="history-item ${state.currentTask?.id === task.id ? "active" : ""}" data-task-id="${escapeHtml(task.id)}"><div><strong>${escapeHtml(task.name || `${task.kernel} · ${task.source_label}`)}</strong><small>${task.completed}/${task.total} · ${formatTime(task.created_at)}</small></div><div class="history-actions"><b>${escapeHtml(task.status)}</b><button type="button" data-rename-task="${escapeHtml(task.id)}" title="重命名任务" aria-label="重命名任务">✎</button></div></div>`).join("") : `<p class="muted-copy">${IS_CLOUD_UI ? "本次临时会话尚无任务" : "本机尚无任务记录"}</p>`;
     $$('[data-task-id]').forEach(item => item.addEventListener("click", async () => {
       state.currentTask = await api(`/api/tasks/${item.dataset.taskId}`);
       state.page = 1;
@@ -593,12 +605,11 @@ function populateProtocolFilter(protocols) {
 async function exportCurrent(format) {
   if (!state.currentTask) return;
   const path = `/api/tasks/${state.currentTask.id}/export?format=${format}`;
-  if (IS_LOCAL_UI) {
-    window.location.href = path;
-    return;
-  }
   try {
-    const response = await fetch(`${LOCAL_API_ORIGIN}${path}`, {targetAddressSpace:"loopback"});
+    const headers = {};
+    const cloudToken = sessionStorage.getItem(CLOUD_SESSION_KEY);
+    if (IS_CLOUD_UI && cloudToken) headers["X-Proxy-Audit-Session"] = cloudToken;
+    const response = await fetch(path, {headers});
     if (!response.ok) throw new Error(`导出失败：HTTP ${response.status}`);
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
@@ -608,6 +619,47 @@ async function exportCurrent(format) {
     link.click();
     URL.revokeObjectURL(url);
   } catch (error) { toast(error.message, "error"); }
+}
+
+async function createCloudSession() {
+  const response = await fetch("/api/session", {method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+  sessionStorage.setItem(CLOUD_SESSION_KEY, data.token);
+  return data.session;
+}
+
+async function resumeCloudSession() {
+  if (!sessionStorage.getItem(CLOUD_SESSION_KEY)) return false;
+  try {
+    await api("/api/session");
+    return true;
+  } catch {
+    sessionStorage.removeItem(CLOUD_SESSION_KEY);
+    sessionStorage.removeItem(SESSION_IMPORT_KEY);
+    sessionStorage.removeItem(SESSION_TASK_KEY);
+    return false;
+  }
+}
+
+async function deleteCloudSession() {
+  if (!IS_CLOUD_UI) return;
+  const button = $("#deleteCloudSession");
+  button.disabled = true;
+  try { await api("/api/session", {method:"DELETE"}); } catch {}
+  sessionStorage.removeItem(CLOUD_SESSION_KEY);
+  sessionStorage.removeItem(SESSION_IMPORT_KEY);
+  sessionStorage.removeItem(SESSION_TASK_KEY);
+  state.system = null;
+  state.imported = null;
+  state.currentTask = null;
+  state.tasks = [];
+  state.selectedNodeIds.clear();
+  $("#healthText").textContent = "云端数据已删除";
+  openModal("onlineModeModal");
+  $("#startCloudSession").textContent = "创建新的 1 小时临时会话";
+  button.disabled = false;
+  toast("会话已失效；活动请求结束后完成内存清理", "success");
 }
 
 async function initializeConnectedApp() {
@@ -620,17 +672,28 @@ async function initializeConnectedApp() {
 
 function setupOnlineMode() {
   document.body.classList.add("online-ui");
-  $("#healthText").textContent = "在线界面 · 等待本地引擎";
+  $("#settingsEyebrow").textContent = "EPHEMERAL SETTINGS";
+  $("#settingsTitle").textContent = "临时会话设置";
+  $("#settingsSubtitle").textContent = "Key 会上传到 HF 临时后端，仅保存在本次进程内存会话。";
+  $("#saveSettings").textContent = "保存到临时会话";
+  $("#healthText").textContent = "云端版 · 等待临时会话";
   openModal("onlineModeModal");
-  $("#connectLocalEngine").addEventListener("click", async () => {
-    const button = $("#connectLocalEngine");
+  $("#startCloudSession").addEventListener("click", async () => {
+    const button = $("#startCloudSession");
     button.disabled = true;
-    button.textContent = "正在连接…";
-    const connected = await initializeConnectedApp();
-    button.disabled = false;
-    button.textContent = connected ? "已连接本地引擎" : "重新连接本地引擎";
-    if (connected) closeModal("onlineModeModal");
+    button.textContent = "正在创建临时会话…";
+    try {
+      await createCloudSession();
+      const connected = await initializeConnectedApp();
+      if (!connected) throw new Error("云端服务暂时不可用");
+      closeModal("onlineModeModal");
+      button.textContent = "开始使用云端版";
+    } catch (error) {
+      button.textContent = "重试创建临时会话";
+      toast(error.message, "error");
+    } finally { button.disabled = false; }
   });
+  $("#deleteCloudSession").addEventListener("click", deleteCloudSession);
 }
 
 function openModal(id) {
@@ -687,8 +750,11 @@ async function boot() {
   migrateLegacyStorage();
   applyPreferences();
   bindEvents();
-  if (!IS_LOCAL_UI) {
+  if (IS_CLOUD_UI) {
     setupOnlineMode();
+    if (await resumeCloudSession()) {
+      if (await initializeConnectedApp()) closeModal("onlineModeModal");
+    }
     return;
   }
   await initializeConnectedApp();

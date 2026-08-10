@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import socket
 import subprocess
 import time
@@ -23,9 +24,11 @@ def is_port_open(host: str, port: int, timeout: float = 0.5) -> bool:
         return s.connect_ex((host, port)) == 0
 
 
-def wait_port(port: int, deadline_sec: int = 18) -> bool:
+def wait_port(port: int, deadline_sec: int = 18, cancel_event=None) -> bool:
     start = time.time()
     while time.time() - start < deadline_sec:
+        if cancel_event is not None and cancel_event.is_set():
+            return False
         if is_port_open('127.0.0.1', port):
             return True
         time.sleep(0.4)
@@ -134,7 +137,15 @@ def build_singbox_config(node: Dict[str, Any], socks_port: int) -> Dict[str, Any
 
 def resolve_singbox_binary() -> Path:
     configured = load_settings().get('singbox_path')
-    return Path(configured) if configured else BIN
+    system_binary = shutil.which('sing-box')
+    candidates = [
+        Path(os.environ['PROXY_AUDIT_SINGBOX_PATH']) if os.environ.get('PROXY_AUDIT_SINGBOX_PATH') else None,
+        Path(configured) if configured else None,
+        BIN_DIR / 'sing-box',
+        BIN,
+        Path(system_binary) if system_binary else None,
+    ]
+    return next((path for path in candidates if path and path.is_file()), BIN)
 
 
 def start_singbox(config_path: Path, log_path: Path, binary_path: Path = None) -> subprocess.Popen:

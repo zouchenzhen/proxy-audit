@@ -46,6 +46,8 @@ def run_node(
     service_targets,
     quality_samples: int,
     cancel_event: Event,
+    runtime_config=None,
+    ephemeral: bool = False,
 ) -> Dict[str, Any]:
     supported, reason = describe_kernel_support(kernel, node)
     safe_name = f"{run_id}_{index:04d}_{kernel.replace('-', '_')}"
@@ -77,7 +79,10 @@ def run_node(
     try:
         started = time.perf_counter()
         proc = start_kernel(kernel, node, socks_port, config_path, log_path)
-        if not wait_port(socks_port, deadline_sec=max(10, timeout + 3)):
+        if not wait_port(socks_port, deadline_sec=max(10, timeout + 3), cancel_event=cancel_event):
+            if cancel_event.is_set():
+                item.update({"cancelled": True, "skip_reason": "Task cancelled while starting the kernel"})
+                return item
             raise RuntimeError(f"{kernel} local SOCKS listener did not become ready")
         item["core_startup_ms"] = round((time.perf_counter() - started) * 1000, 1)
         if cancel_event.is_set():
@@ -89,10 +94,18 @@ def run_node(
             providers=providers,
             service_targets=service_targets,
             quality_samples=quality_samples,
+            cfg=runtime_config,
+            cancel_event=cancel_event,
         )
+        if cancel_event.is_set():
+            item.update({"cancelled": True, "skip_reason": "Task cancelled after the current request"})
+            return item
         item["success"] = True
         return item
     except Exception as exc:
+        if cancel_event.is_set() or isinstance(exc, InterruptedError):
+            item.update({"cancelled": True, "skip_reason": "Task cancelled", "error": None})
+            return item
         item["log_tail"] = tail_text(log_path)
         item["error"] = friendly_run_error(exc, item["log_tail"])
         return item
@@ -106,3 +119,9 @@ def run_node(
             pass
         if not item["log_tail"] and not item["success"]:
             item["log_tail"] = tail_text(log_path)
+        if ephemeral:
+            try:
+                log_path.unlink(missing_ok=True)
+                item["log_path"] = None
+            except OSError:
+                pass

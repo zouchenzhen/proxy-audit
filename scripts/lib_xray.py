@@ -14,13 +14,16 @@ DEFAULT_BIN = BIN_DIR / "xray.exe"
 
 def resolve_xray_binary() -> Path:
     configured = load_settings().get("xray_path")
+    system_binary = shutil.which("xray")
     candidates = [
+        Path(os.environ["PROXY_AUDIT_XRAY_PATH"]) if os.environ.get("PROXY_AUDIT_XRAY_PATH") else None,
         Path(configured) if configured else None,
+        BIN_DIR / "xray",
         DEFAULT_BIN,
-        Path(shutil.which("xray")) if shutil.which("xray") else None,
+        Path(system_binary) if system_binary else None,
         Path(r"E:\application\v2rayN-windows-64-SelfContained\bin\xray\xray.exe"),
     ]
-    return next((path for path in candidates if path and path.exists()), DEFAULT_BIN)
+    return next((path for path in candidates if path and path.is_file()), DEFAULT_BIN)
 
 
 def describe_xray_support(node: Dict[str, Any]):

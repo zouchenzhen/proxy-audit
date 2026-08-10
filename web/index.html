@@ -15,7 +15,8 @@
       <div><strong>Proxy Audit</strong><small>NODE INTELLIGENCE CONSOLE</small></div>
     </div>
     <div class="top-actions">
-      <div class="health-pill"><i id="healthDot"></i><span id="healthText">连接本地引擎…</span></div>
+      <div class="health-pill"><i id="healthDot"></i><span id="healthText">正在连接…</span></div>
+      <button class="small-button cloud-only" id="deleteCloudSession" title="立即取消任务并触发本次云端会话清理">立即取消并删除会话</button>
       <button class="icon-button theme-button" id="themeButton" title="切换深色/浅色模式" aria-label="切换深色或浅色模式"><span>◐</span></button>
       <button class="icon-button" id="settingsButton" title="本机设置" aria-label="打开本机设置">
         <svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.55V21h-4v-.08A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1.03H3v-4h.08A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 10 3.02V3h4v.08a1.7 1.7 0 0 0 1.03 1.52 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 7l-.06.06a1.7 1.7 0 0 0-.34 1.88c.25.62.86 1.03 1.55 1.03H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg>
@@ -40,12 +41,12 @@
             <input type="file" id="nodeFile" accept=".txt,.zip,.db,.sqlite,.sqlite3">
             <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 15v4h14v-4"/></svg>
             <strong id="fileLabel">选择或拖入文件</strong>
-            <small>TXT / ZIP / guiNDB.db · 最大 64 MB</small>
+            <small id="uploadLimitHint">TXT / ZIP / guiNDB.db · 最大 64 MB</small>
           </label>
         </div>
         <div class="tab-panel" data-panel="url">
           <input id="subscriptionUrl" type="url" placeholder="https://example.com/subscription">
-          <p class="field-hint">订阅只在本机后端读取，不会上传到其他服务器。</p>
+          <p class="field-hint local-copy">订阅只在本机后端读取，不会上传到其他服务器。</p><p class="field-hint cloud-copy">云端版会把订阅 URL 交给临时检测后端读取；会话到期或手动删除后清除。</p>
         </div>
         <button class="secondary wide" id="importButton"><span>解析并预览</span><kbd>↵</kbd></button>
         <div class="import-summary hidden" id="importSummary"></div>
@@ -139,7 +140,7 @@
 
       <section class="bottom-grid">
         <article class="activity-card">
-          <div class="card-heading"><div><span class="eyebrow">LIVE FEED</span><h2>任务动态</h2></div><span class="live-indicator"><i></i>LOCAL</span></div>
+          <div class="card-heading"><div><span class="eyebrow">LIVE FEED</span><h2>任务动态</h2></div><span class="live-indicator"><i></i><span class="local-copy">LOCAL</span><span class="cloud-copy">CLOUD</span></span></div>
           <div class="event-list" id="eventList"><div class="event muted"><time>--:--:--</time><span>等待任务事件</span></div></div>
         </article>
         <article class="history-card">
@@ -152,22 +153,22 @@
 
   <div class="modal-backdrop hidden" id="onlineModeModal">
     <section class="modal online-mode-modal" role="dialog" aria-modal="true" aria-labelledby="onlineModeTitle">
-      <header><div><span class="eyebrow">LOCAL-FIRST WEB UI</span><h2 id="onlineModeTitle">在线界面，检测仍在本机完成</h2><p>Cloudflare Pages 只提供这份静态 HTML、CSS 和 JavaScript。</p></div></header>
+      <header><div><span class="eyebrow">EPHEMERAL CLOUD SESSION</span><h2 id="onlineModeTitle">开箱即用的临时云端检测</h2><p>无需下载本地程序；检测由 Hugging Face Docker Space 中的临时后端完成。</p></div></header>
       <div class="modal-body">
-        <div class="online-privacy-card"><strong>节点、订阅、API Key 和结果不会上传到 Proxy Audit 云端</strong><p>它们只会发送给你电脑上的 <code>127.0.0.1:8765</code> 本地引擎。项目未部署接收这些内容的云端 API、数据库、遥测或分析脚本。</p></div>
-        <ol class="online-steps"><li>先在电脑上启动 Proxy Audit 本地引擎（双击 <code>start-web.cmd</code>）。</li><li>点击下方按钮；Chrome/Edge 如询问“本地网络访问”，请选择允许。</li><li>连接后即可在这个页面导入节点、填写 Key 并检测，数据仍保存在本机。</li></ol>
-        <p class="online-caveat">隐私边界：Cloudflare 会处理加载静态页面所需的常规访问元数据；你启用的订阅服务器、IP 情报商和测试端点仍会收到完成请求所必需的数据。它们不属于 Proxy Audit 云端。</p>
+        <div class="online-privacy-card"><strong>继续即表示同意把待测节点、订阅内容、所填 API Key 和结果上传到临时云端后端</strong><p>数据仅用于本次检测，保存在进程内存中；会话最长 1 小时，到期触发取消与清理，服务重启也会全部丢失。请完成后立即导出，并可点击顶部“立即取消并删除会话”。</p></div>
+        <ol class="online-steps"><li>每个浏览器标签页创建一个随机匿名会话，不需要注册 Proxy Audit 账号。</li><li>单任务最多 20 个节点、并发最多 2；仅允许检测本人所有或已获授权的公网节点。</li><li>订阅服务器、IP 情报商和测试端点仍会收到完成请求所必需的数据。</li></ol>
+        <p class="online-caveat">到期或手动删除会立即使会话失效；正在执行的单次网络请求可能要等最长 12 秒超时后释放。Hugging Face 仍会处理常规访问日志和基础设施元数据。高敏感节点请使用仓库中的本地版。</p>
       </div>
-      <footer><button class="primary" id="connectLocalEngine">连接本地引擎</button></footer>
+      <footer><a class="secondary button-link" href="/legal#privacy" target="_blank" rel="noopener">查看隐私边界</a><button class="primary" id="startCloudSession">同意并创建 1 小时会话</button></footer>
     </section>
   </div>
 
   <div class="modal-backdrop hidden" id="settingsModal">
     <section class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
-      <header><div><span class="eyebrow">LOCAL VAULT</span><h2 id="settingsTitle">本机设置</h2><p>Key 仅保存在本机；Windows 使用当前用户 DPAPI 加密。</p></div><button class="icon-button" data-close="settingsModal">×</button></header>
+      <header><div><span class="eyebrow" id="settingsEyebrow">LOCAL VAULT</span><h2 id="settingsTitle">本机设置</h2><p id="settingsSubtitle">Key 仅保存在本机；Windows 使用当前用户 DPAPI 加密。</p></div><button class="icon-button" data-close="settingsModal">×</button></header>
       <div class="modal-body">
-        <div class="settings-section"><h3>IP 情报服务商</h3><p class="settings-help">每个服务商可加入多个 Key（每行一个，最多 50 个）。后台会轮询使用，鉴权失败或额度受限时自动切换下一枚。</p><div class="settings-grid" id="keySettings"></div></div>
-        <div class="settings-section"><h3>检测内核路径</h3>
+        <div class="settings-section"><h3>IP 情报服务商</h3><p class="settings-help" id="keyLimitHelp">每个服务商可加入多个 Key（每行一个，最多 50 个）。后台会轮询使用，鉴权失败或额度受限时自动切换下一枚。</p><div class="settings-grid" id="keySettings"></div></div>
+        <div class="settings-section local-copy"><h3>检测内核路径</h3>
           <label><span>sing-box.exe</span><input id="settingSingbox" placeholder="留空使用项目 bin/sing-box.exe"></label>
           <label><span>xray.exe</span><input id="settingXray" placeholder="留空自动发现 v2rayN 内核"></label>
         </div>
@@ -175,9 +176,9 @@
           <div class="preference-grid">
             <label><span>颜色模式</span><select id="themeSelect"><option value="system">跟随系统</option><option value="dark">深色</option><option value="light">浅色</option></select></label>
             <label><span>界面字号</span><select id="fontSizeSelect"><option value="standard">标准</option><option value="large">较大（推荐）</option><option value="xlarge">特大</option></select></label>
-            <label><span>最近任务显示数</span><input id="settingHistoryLimit" type="number" min="1" max="100" value="10"></label>
+            <label class="local-copy"><span>最近任务显示数</span><input id="settingHistoryLimit" type="number" min="1" max="100" value="10"></label>
           </div>
-          <p class="preference-note">主题和字号保存在当前浏览器；任务显示数保存在本机后端。减少数量不会删除已有报告文件。</p>
+          <p class="preference-note local-copy">主题和字号保存在当前浏览器；任务显示数保存在本机后端。减少数量不会删除已有报告文件。</p><p class="preference-note cloud-copy">主题和字号保存在当前浏览器；Key、任务和结果只存在本次云端内存会话，最长 1 小时。</p>
         </div>
         <p class="vault-note" id="vaultNote"></p>
       </div>
@@ -194,7 +195,7 @@
 
   <div class="modal-backdrop hidden" id="renameModal">
     <section class="modal rename-modal" role="dialog" aria-modal="true" aria-labelledby="renameTitle">
-      <header><div><span class="eyebrow">TASK LABEL</span><h2 id="renameTitle">重命名历史任务</h2><p>名称会保存在本机脱敏任务记录中。</p></div><button class="icon-button" data-close="renameModal">×</button></header>
+      <header><div><span class="eyebrow">TASK LABEL</span><h2 id="renameTitle">重命名历史任务</h2><p class="local-copy">名称会保存在本机脱敏任务记录中。</p><p class="cloud-copy">名称只存在本次临时云端会话中。</p></div><button class="icon-button" data-close="renameModal">×</button></header>
       <div class="modal-body"><label class="rename-field"><span>任务名称</span><input id="renameTaskInput" maxlength="80" placeholder="例如：香港节点晚间复测"></label></div>
       <footer><button class="secondary" data-close="renameModal">取消</button><button class="primary" id="saveTaskName">保存名称</button></footer>
     </section>

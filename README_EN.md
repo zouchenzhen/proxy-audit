@@ -5,29 +5,44 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![Security and tests](https://github.com/zouchenzhen/proxy-audit/actions/workflows/security-and-tests.yml/badge.svg)](https://github.com/zouchenzhen/proxy-audit/actions/workflows/security-and-tests.yml)
 
-Proxy Audit is a local Windows application for batch-testing proxy node connectivity and exit-IP quality. It imports v2rayN backups, databases, subscriptions, and share links; runs real outbound checks through sing-box or Xray; enriches exit IPs with multiple intelligence providers; and presents searchable, filterable results in a Web UI.
+Proxy Audit is a Web UI for batch-testing proxy node connectivity and exit-IP quality. It has an ephemeral Hugging Face edition and a localhost Windows edition. It imports v2rayN backups, databases, subscriptions, and share links; runs real outbound checks through sing-box or Xray; enriches exit IPs with multiple intelligence providers; and presents searchable, filterable results.
 
 > [!IMPORTANT]
 > Test only assets that you own, manage, or have explicit permission to test. Follow applicable local laws and third-party service terms. Proxy Audit is not a node provider and does not offer a public proxy service, access-control bypass, or anonymity guarantee.
 
-## Online UI
+## Online edition
 
-Open: [https://proxy-audit.pages.dev](https://proxy-audit.pages.dev)
+Planned entry: [https://zouchenzhen-zcz.hf.space](https://zouchenzhen-zcz.hf.space)
 
-Cloudflare Pages serves static HTML, CSS, and JavaScript only. There is no Proxy Audit cloud API,
-database, telemetry, or analytics endpoint receiving your nodes, subscriptions, API keys, or results.
-The full audit still runs in the local engine at `127.0.0.1:8765`, so start `start-web.cmd` on your PC
-first. Chrome or Edge may ask you to allow local-network access when connecting for the first time.
+> [!WARNING]
+> The Space repository now contains Proxy Audit, but an abuse suspension inherited from its retired
+> 2025 workload still requires manual Hugging Face review. The hosted app is not yet available; use
+> the local edition until this notice is removed.
 
-Cloudflare necessarily processes ordinary metadata needed to serve the static page. Subscription
-servers, enabled IP-intelligence providers, and optional probe endpoints still receive the data needed
-to answer their requests; these are not Proxy Audit cloud services.
+No local download is required. The page and audit backend run in the same Hugging Face Docker Space.
+After explicit consent, each browser tab receives an anonymous temporary session and uploads nodes,
+subscriptions, API keys, tasks, and results to the HF backend.
+
+- Proxy Audit keeps that data in one process's memory and task-scoped temporary files, not a database.
+- A session lasts at most one hour. Expiry or manual deletion invalidates it immediately and triggers
+  cancellation and cleanup; an in-flight network request may take up to its 12-second timeout to exit.
+- Space restart, sleep, or redeployment destroys all sessions, so export results immediately.
+- Each import/task is limited to 20 nodes, concurrency to 2, and each client network to 100 nodes/day.
+- Hugging Face and the selected subscription/intelligence/probe services still process data required
+  for the request. Use the local edition for sensitive, large, or persistent workloads.
+
+The Space card links to the upstream licenses and corresponding-source archives shipped with the
+pinned sing-box and Xray builds under `/third-party/`.
+
+HF PRO is a paid subscription (currently US$9/month), not a free card-verification benefit. This
+deployment keeps the existing free `cpu-basic` hardware and does not request a paid upgrade. Free
+CPU Basic Spaces currently sleep after roughly 48 hours of inactivity and cold-start on a later visit.
 
 API keys can be registered on each provider's official website. Free plans are generally sufficient
 for low-volume personal use; current quotas and terms are determined by each provider. Providers that
 do not require a key can also be used directly.
 
-## Quick start
+## Local edition quick start
 
 Windows 11 and Python 3.10+ are recommended.
 
@@ -80,8 +95,8 @@ All screenshots below were generated in an isolated acceptance environment with 
 - The API never returns a complete saved key to the browser. The eye button reveals only a short prefix for identification.
 - Node credentials are used only in memory and one-time core configurations, which are deleted after each check.
 - New Web tasks remove UUIDs, passwords, subscription URLs, and log tails from saved and exported results.
-- The project has no official cloud account, advertising, or telemetry. Checks are not fully offline: subscription servers, enabled IP intelligence providers, and optional probe endpoints receive the network data required to answer each request.
-- Keep the panel on `127.0.0.1`; do not expose it through port forwarding, a reverse proxy, or a public tunnel.
+- The HF edition uploads operational data to its ephemeral backend; it does not persist a project database or include third-party analytics SDKs. The local edition does not send that data to a Proxy Audit backend.
+- Both editions contact selected subscription servers, intelligence providers, and probe endpoints. Keep the local panel on `127.0.0.1` and do not expose it through a public tunnel.
 
 See [Privacy](PRIVACY.md), [Security Policy](SECURITY.md), and [Responsible Use](COMPLIANCE.md) for details. Never publish real subscriptions, node credentials, API keys, or identifiable result data in issues, pull requests, logs, or screenshots.
 
@@ -92,10 +107,10 @@ python -m pip install -r requirements-dev.txt
 python -m unittest discover -s tests -v
 python scripts/scan_git_history.py
 python tests/ui_browser_acceptance.py
-python tests/ui_online_acceptance.py
+python tests/ui_online_acceptance.py --url "https://zouchenzhen-zcz.hf.space/"
 ```
 
-The browser acceptance test launches an isolated local backend and a temporary headless Chrome profile. It exercises settings, import preview, authorization confirmation, partial selection, task history, filtering, themes, and layout checks without touching your normal browser profile.
+Browser acceptance uses a temporary headless Chrome profile. It exercises settings, import preview, authorization confirmation, partial selection, task history, filtering, themes, and layout checks without touching your normal browser profile.
 
 An optional privacy-safe live-network sampler is also available:
 
@@ -114,4 +129,4 @@ python tests/real_local_acceptance.py --db "E:\path\to\v2rayN\guiConfigs\guiNDB.
 
 Original project code is licensed under the [Apache License 2.0](LICENSE), including its patent grant and NOTICE requirements.
 
-sing-box (GPL-3.0-or-later), Xray-core (MPL-2.0), Python packages, and external IP intelligence services are independent third-party components and are not relicensed under Apache-2.0. The official repository does not distribute core binaries. See [Third-Party Notices](THIRD_PARTY_NOTICES.md), [NOTICE](NOTICE), and [Trademark Policy](TRADEMARKS.md).
+sing-box (GPL-3.0-or-later), Xray-core (MPL-2.0), Python packages, and external IP intelligence services are independent third-party components and are not relicensed under Apache-2.0. The source repository does not commit core binaries; the HF image redistributes pinned builds together with upstream licenses and corresponding source archives. See [Third-Party Notices](THIRD_PARTY_NOTICES.md), [NOTICE](NOTICE), and [Trademark Policy](TRADEMARKS.md).

@@ -12,7 +12,7 @@
     <section class="legal-hero">
       <span class="eyebrow">RESPONSIBLE USE</span>
       <h1>使用、隐私与安全边界</h1>
-      <p>Proxy Audit 是只在本机运行的节点连通性与出口 IP 质量检测工具。请仅检测本人所有、本人管理或已经取得明确测试授权的节点。</p>
+      <p>Proxy Audit 提供 Hugging Face 临时云端版与本地版，用于节点连通性与出口 IP 质量检测。请仅检测本人所有、本人管理或已取得明确测试授权的节点。</p>
       <div class="legal-nav">
         <a href="#compliance">使用边界</a><a href="#privacy">隐私流向</a><a href="#security">安全部署</a><a href="#licenses">第三方许可</a><a class="legal-back" href="/">返回面板</a>
       </div>
@@ -30,20 +30,21 @@
 
     <section class="legal-section" id="privacy">
       <h2>隐私与数据流向</h2>
-      <p>项目没有官方云端账户、广告或遥测。节点凭据只用于内存和一次性内核配置，不进入结果文件；API Key 在 Windows 下使用当前用户 DPAPI 加密，完整 Key 不会回传浏览器。</p>
+      <p><strong>云端版：</strong>节点、订阅、API Key、任务和结果会上传到 Hugging Face 临时后端，保存在匿名进程内存会话中；会话最长一小时，到期或手动删除会立即失效并触发取消与清理。正在执行的单次请求可能在最长 12 秒超时后释放。</p>
+      <p><strong>本地版：</strong>面板只监听 <code>127.0.0.1</code>；节点凭据只用于内存和一次性内核配置，API Key 在 Windows 下由当前用户 DPAPI 加密，脱敏历史由用户自行保存在本机。</p>
       <p>检测并非完全离线：订阅服务器会收到拉取请求；ipify 请求经待测节点发出；启用的 IP 情报商会收到被查询出口 IP 和相应 API Key；可选测试端点会看到节点出口 IP 与常规网络元数据。</p>
       <p>详细保存位置、第三方流向和删除方法见 <a href="https://github.com/zouchenzhen/proxy-audit/blob/main/PRIVACY.md" target="_blank" rel="noopener">PRIVACY.md</a>。</p>
     </section>
 
     <section class="legal-section" id="security">
       <h2>安全部署</h2>
-      <ul><li>面板只应监听 <code>127.0.0.1</code>，不要用端口映射、反向代理或 Tunnel 暴露到公网；</li><li>不要在 Issue、PR、截图和日志中提交真实订阅、UUID、密码、Key 或出口 IP；</li><li>只使用可信内核，保留下载校验，并限制项目与结果目录的本机访问权限。</li></ul>
+      <ul><li>高敏感、大批量或需要持久历史的数据优先使用只监听 <code>127.0.0.1</code> 的本地版；</li><li>不要自行把本地面板用端口映射、反向代理或 Tunnel 暴露到公网；</li><li>不要在 Issue、PR、截图和日志中提交真实订阅、UUID、密码、Key 或出口 IP；</li><li>只使用可信内核并保留下载校验。</li></ul>
       <p>漏洞请按 <a href="https://github.com/zouchenzhen/proxy-audit/security/policy" target="_blank" rel="noopener">Security Policy</a> 私下报告。</p>
     </section>
 
     <section class="legal-section" id="licenses">
       <h2>开源与第三方许可</h2>
-      <p>本项目自有代码采用 Apache License 2.0。sing-box 是独立下载、独立运行的 GPL-3.0-or-later 软件；Xray-core 是用户自行提供或本机发现的 MPL-2.0 软件。Apache-2.0 不覆盖这些第三方程序。</p>
+      <p>本项目自有代码采用 Apache License 2.0。sing-box 是 GPL-3.0-or-later 软件，Xray-core 是 MPL-2.0 软件；本地版按需发现/下载，HF 镜像固定版本分发并附上游许可与源码归档。Apache-2.0 不覆盖这些第三方程序。</p>
       <p>完整清单见 <a href="https://github.com/zouchenzhen/proxy-audit/blob/main/THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">THIRD_PARTY_NOTICES.md</a>。</p>
     </section>
   </main>

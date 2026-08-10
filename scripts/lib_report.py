@@ -35,21 +35,22 @@ def build_summary_rows(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         quality = (((item.get('result') or {}).get('quality')) or {})
         services = (((item.get('result') or {}).get('services')) or {})
         abuse = (((item.get('result') or {}).get('abuseipdb')) or {})
+        cloud_redacted = bool(node.get("_cloud_redacted"))
         rows.append({
             'remark': node.get('remark'),
             'protocol': node.get('protocol'),
             'kernel': item.get('kernel'),
             'source_type': node.get('source_type'),
-            'source_name': node.get('source_name'),
-            'subscription_name': node.get('subscription_name'),
+            'source_name': None if cloud_redacted else node.get('source_name'),
+            'subscription_name': None if cloud_redacted else node.get('subscription_name'),
             'is_subscription': node.get('is_subscription'),
-            'server': node.get('server'),
+            'server': node.get('_display_server') or node.get('server'),
             'port': node.get('server_port'),
             'network': node.get('network'),
             'tls_mode': node.get('tls_mode'),
-            'sni': node.get('sni'),
-            'host': node.get('host'),
-            'path': node.get('path'),
+            'sni': None if cloud_redacted else node.get('sni'),
+            'host': None if cloud_redacted else node.get('host'),
+            'path': None if cloud_redacted else node.get('path'),
             'supported': item.get('supported'),
             'success': item.get('success'),
             'skip_reason': item.get('skip_reason'),
@@ -132,7 +133,7 @@ def write_markdown_report(path: Path, meta: Dict[str, Any], results: List[Dict[s
         lines.append(f"- protocol: `{node.get('protocol')}`")
         lines.append(f"- source_type: `{node.get('source_type')}`")
         lines.append(f"- source_name: `{node.get('source_name')}`")
-        lines.append(f"- server: `{node.get('server')}:{node.get('server_port')}`")
+        lines.append(f"- server: `{node.get('_display_server') or node.get('server')}:{node.get('server_port')}`")
         lines.append(f"- network: `{node.get('network')}` / tls: `{node.get('tls_mode')}`")
         lines.append(f"- supported: `{item.get('supported')}`")
         lines.append(f"- success: `{item.get('success')}`")
