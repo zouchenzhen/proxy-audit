@@ -26,7 +26,7 @@ class WebApiTests(unittest.TestCase):
     def test_local_legal_page_and_authorization_gate(self):
         legal = self.client.get("/legal")
         self.assertEqual(legal.status_code, 200)
-        self.assertIn("合规、隐私与安全边界", legal.get_data(as_text=True))
+        self.assertIn("使用、隐私与安全边界", legal.get_data(as_text=True))
         legal.close()
         imported = self.client.post(
             "/api/import",

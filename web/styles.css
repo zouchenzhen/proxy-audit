@@ -269,8 +269,10 @@ tbody tr:hover { background: #10161e; }
 .saved-key.pending-remove { opacity:.45;text-decoration:line-through;border-color:rgba(255,96,116,.42); }
 .key-remove,.key-eye { border:1px solid var(--line);border-radius:6px;background:#111821;color:var(--muted);cursor:pointer; }
 .key-remove { width:20px;height:20px;padding:0;line-height:1; }
-.key-eye { width:36px;height:36px;font-size:15px; }
+.key-eye { width:36px;height:36px;flex:0 0 36px;display:inline-flex;align-items:center;justify-content:center;padding:0; }
+.key-eye-icon { width:18px;height:18px;display:block;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round; }
 .key-eye:hover,.key-remove:hover { color:var(--text);border-color:#465363; }
+.settings-modal footer button { width:148px;min-width:148px;height:48px;min-height:48px;flex:0 0 148px;margin:0;padding:0; }
 .settings-section .clear-option { height:36px;display:flex;align-items:center;gap:5px;padding:0 9px;border:1px solid rgba(255,96,116,.24);border-radius:8px;background:rgba(255,96,116,.035);color:#d4939c;font-size:8px;cursor:pointer; }
 .settings-section .clear-option:hover { border-color:rgba(255,96,116,.5); }
 .settings-section .clear-option input { width:12px;height:12px;margin:0;padding:0;accent-color:var(--red); }
@@ -351,6 +353,7 @@ body.legal-page { min-height:100vh;overflow:auto;background:var(--bg);color:var(
 .legal-section a { color:#66bfff; }
 .legal-warning { border-left:4px solid var(--amber);padding:12px 14px;background:rgba(255,189,74,.06);color:var(--text);line-height:1.65; }
 @media (max-width:640px){.legal-shell{width:min(100% - 22px,980px);margin-top:14px}.legal-hero,.legal-section{padding:20px}.legal-hero h1{font-size:24px}}
+@media (max-width:640px){.settings-modal footer button{width:auto;min-width:0;flex:1 1 0;}}
 html[data-theme="light"] .metric-card { background:linear-gradient(145deg,#fff,#f3f7fc); }
 html[data-theme="light"] .metric-card.accent { background:linear-gradient(145deg,rgba(72,173,46,.13),#fff 70%); }
 html[data-theme="light"] .task-strip,html[data-theme="light"] .activity-card,html[data-theme="light"] .history-card,html[data-theme="light"] .modal { background:#fff;box-shadow:0 18px 55px rgba(45,69,98,.12); }

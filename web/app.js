@@ -150,6 +150,12 @@ function renderServices() {
     <label><input type="checkbox" value="${escapeHtml(service.id)}"><span>${escapeHtml(service.name)}</span></label>`).join("");
 }
 
+function keyVisibilityIcon(visible) {
+  return visible
+    ? `<svg class="key-eye-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 3l18 18M10.6 6.2A10.8 10.8 0 0 1 12 6c6.5 0 10 6 10 6a18.4 18.4 0 0 1-3.1 3.7M6.2 6.3C3.5 8.1 2 12 2 12s3.5 6 10 6a10.8 10.8 0 0 0 3.1-.5M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>`
+    : `<svg class="key-eye-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>`;
+}
+
 function renderSettings() {
   const settings = state.system?.settings || {};
   const configured = settings.configured || {};
@@ -170,7 +176,7 @@ function renderSettings() {
       ${savedKeys}
       <div class="key-input-row">
         ${isSecret
-          ? `<textarea class="secret-entry" data-setting="${field}" autocomplete="off" spellcheck="false" placeholder="${isConfigured ? "每行添加一个新 Key；留空保留" : "每行填写一个 Key"}"></textarea><button type="button" class="key-eye" data-key-eye="${field}" title="仅显示已保存 Key 的短前缀" aria-label="显示 Key 短前缀">◉</button>`
+          ? `<textarea class="secret-entry" data-setting="${field}" autocomplete="off" spellcheck="false" placeholder="${isConfigured ? "每行添加一个新 Key；留空保留" : "每行填写一个 Key"}"></textarea><button type="button" class="key-eye" data-key-eye="${field}" title="仅显示已保存 Key 的短前缀" aria-label="显示 Key 短前缀" aria-pressed="false">${keyVisibilityIcon(false)}</button>`
           : `<input type="text" data-setting="${field}" autocomplete="off" placeholder="${isConfigured ? "留空保留现有值" : "未配置"}">`}
         ${isConfigured ? `<label class="clear-option" title="勾选后保存将清除此项"><input type="checkbox" data-clear="${field}"><span>清空</span></label>` : ""}
       </div>
@@ -182,8 +188,10 @@ function renderSettings() {
     $$(`[data-key-list="${field}"] code`).forEach(code => {
       code.textContent = visible ? code.dataset.prefix : code.dataset.masked;
     });
-    button.textContent = visible ? "◉" : "◎";
+    button.innerHTML = keyVisibilityIcon(visible);
     button.title = visible ? "隐藏 Key 短前缀" : "仅显示已保存 Key 的短前缀";
+    button.setAttribute("aria-label", visible ? "隐藏 Key 短前缀" : "显示 Key 短前缀");
+    button.setAttribute("aria-pressed", String(visible));
   }));
   $$('[data-remove-key]').forEach(button => button.addEventListener("click", () => {
     const field = button.dataset.removeKey;

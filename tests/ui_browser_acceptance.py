@@ -209,6 +209,12 @@ def main():
               clearControls: document.querySelectorAll('.clear-option').length,
               keyPoolInputs: document.querySelectorAll('.secret-entry').length,
               keyEyes: document.querySelectorAll('[data-key-eye]').length,
+              keyEyeSvgs: document.querySelectorAll('[data-key-eye] svg.key-eye-icon').length,
+              keyEyePressed: document.querySelector('[data-key-eye]').getAttribute('aria-pressed'),
+              footerButtonSizes: [...document.querySelectorAll('.settings-modal footer button')].map(button => {
+                const rect = button.getBoundingClientRect();
+                return {width: rect.width, height: rect.height};
+              }),
             };
           })()
         """)
@@ -217,6 +223,16 @@ def main():
         assert modal["fieldOverflow"] == 0, modal
         assert modal["keyPoolInputs"] == 5, modal
         assert modal["keyEyes"] == 5, modal
+        assert modal["keyEyeSvgs"] == 5, modal
+        assert modal["keyEyePressed"] == "false", modal
+        assert len(modal["footerButtonSizes"]) == 2, modal
+        assert abs(modal["footerButtonSizes"][0]["width"] - modal["footerButtonSizes"][1]["width"]) <= 1, modal
+        assert abs(modal["footerButtonSizes"][0]["height"] - modal["footerButtonSizes"][1]["height"]) <= 1, modal
+        assert modal["footerButtonSizes"][0]["height"] >= 48, modal
+        cdp.evaluate("document.querySelector('[data-key-eye]').click()")
+        assert cdp.evaluate("document.querySelector('[data-key-eye]').getAttribute('aria-pressed')") == "true"
+        assert cdp.evaluate("document.querySelector('[data-key-eye] svg.key-eye-icon') !== null")
+        assert cdp.evaluate("document.querySelector('[data-key-eye]').getAttribute('aria-label')") == "隐藏 Key 短前缀"
         cdp.screenshot(Path(args.screenshot))
         cdp.evaluate("document.querySelector('[data-close=" + json.dumps("settingsModal") + "]').click()")
         wait_for(lambda: cdp.evaluate("document.querySelector('#settingsModal').classList.contains('hidden')"), message="settings close")
@@ -261,6 +277,8 @@ socks://demo-jp.invalid:1080#Demo-JP-Node-02`;
           font.value = 'xlarge'; font.dispatchEvent(new Event('change', {bubbles:true}));
         """)
         assert cdp.evaluate("document.documentElement.dataset.fontSize") == "xlarge"
+        light_settings_screenshot = Path(args.screenshot).with_name(Path(args.screenshot).stem + "-settings-light" + Path(args.screenshot).suffix)
+        cdp.screenshot(light_settings_screenshot)
         light_screenshot = Path(args.screenshot).with_name(Path(args.screenshot).stem + "-light" + Path(args.screenshot).suffix)
         cdp.evaluate("document.querySelector('[data-close=" + json.dumps("settingsModal") + "]').click()")
         cdp.screenshot(light_screenshot)
@@ -307,7 +325,7 @@ socks://demo-jp.invalid:1080#Demo-JP-Node-02`;
 
         cdp.call("Page.navigate", {"url": f"http://127.0.0.1:{app_port}/legal"})
         wait_for(lambda: cdp.evaluate("document.readyState === 'complete'"), message="legal page load")
-        assert cdp.evaluate("document.querySelector('h1').textContent") == "合规、隐私与安全边界"
+        assert cdp.evaluate("document.querySelector('h1').textContent") == "使用、隐私与安全边界"
         assert cdp.evaluate("document.querySelectorAll('.legal-section').length") == 4
         assert cdp.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth")
         legal_screenshot = Path(args.screenshot).with_name(Path(args.screenshot).stem + "-legal" + Path(args.screenshot).suffix)
@@ -335,6 +353,7 @@ socks://demo-jp.invalid:1080#Demo-JP-Node-02`;
             "previewScreenshot": str(preview_screenshot),
             "complianceScreenshot": str(compliance_screenshot),
             "lightScreenshot": str(light_screenshot),
+            "lightSettingsScreenshot": str(light_settings_screenshot),
             "legalScreenshot": str(legal_screenshot),
         }
         print(json.dumps(summary, ensure_ascii=False))

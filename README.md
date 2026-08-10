@@ -1,12 +1,14 @@
 # ProxyScope / proxy_audit
 
+[简体中文](README.md) | [English](README_EN.md)
+
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![Security and tests](https://github.com/zouchenzhen/proxy-audit/actions/workflows/security-and-tests.yml/badge.svg)](https://github.com/zouchenzhen/proxy-audit/actions/workflows/security-and-tests.yml)
 
 Windows 11 下的代理节点批量检测工具。目标是从 v2rayN 备份 / 数据库 / 分享链接中读取节点，使用 sing-box 建立本地代理并真实出站测试，查询出口 IP 的多源情报，最后输出可读报表。
 
 > [!IMPORTANT]
-> 仅检测本人所有、本人管理或已经取得明确测试授权的节点。项目不是节点提供商，不提供公共代理、绕过访问控制或匿名保证。使用前请阅读[合规说明](COMPLIANCE.md)和[隐私说明](PRIVACY.md)。这不是针对具体使用场景的法律意见。
+> 请仅检测本人所有、本人管理或已经取得明确测试授权的节点，并遵守所在地法律法规及第三方服务条款。项目不是节点提供商，不提供公共代理、绕过访问控制或匿名保证。使用前请阅读[负责任使用说明](COMPLIANCE.md)和[隐私说明](PRIVACY.md)。
 
 治理与发布文档：[Security Policy](SECURITY.md) · [第三方许可](THIRD_PARTY_NOTICES.md) · [品牌使用](TRADEMARKS.md) · [公开发布检查清单](docs/PUBLIC_RELEASE_CHECKLIST.md) · [Apache-2.0](LICENSE)
 
