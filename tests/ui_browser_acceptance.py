@@ -222,19 +222,20 @@ def main():
         wait_for(lambda: cdp.evaluate("document.querySelector('#settingsModal').classList.contains('hidden')"), message="settings close")
 
         cdp.evaluate("""
-          document.querySelector('#nodeText').value = `socks://browser-acceptance-a.invalid:1080#Browser-Acceptance-A
-socks://browser-acceptance-b.invalid:1080#Browser-Acceptance-B`;
+          document.querySelector('#nodeText').value = `socks://demo-us.invalid:1080#Demo-US-Node-01
+socks://demo-jp.invalid:1080#Demo-JP-Node-02`;
           document.querySelector('#importButton').click();
         """)
         wait_for(lambda: cdp.evaluate("!document.querySelector('#importSummary').classList.contains('hidden')"), message="UI node import")
         assert cdp.evaluate("document.querySelector('#metricImported').textContent") == "2"
-        assert cdp.evaluate("document.querySelector('#startButton').disabled") is False
+        assert cdp.evaluate("document.querySelector('#startButton').disabled") is True
+        assert "确认节点授权" in cdp.evaluate("document.querySelector('#startHint').textContent")
         assert cdp.evaluate("document.querySelectorAll('#resultBody tr').length") == 2
         assert cdp.evaluate("document.querySelector('#resultBody .status-pending').textContent") == "待检测"
-        assert "Browser-Acceptance-A" in cdp.evaluate("document.querySelector('#resultBody').textContent")
+        assert "Demo-US-Node-01" in cdp.evaluate("document.querySelector('#resultBody').textContent")
         cdp.evaluate("document.querySelector('[data-node-select]').click()")
         assert "已选择 1 个节点" in cdp.evaluate("document.querySelector('#selectionCount').textContent")
-        assert "仅检测已选 1 个节点" in cdp.evaluate("document.querySelector('#startHint').textContent")
+        assert "确认节点授权" in cdp.evaluate("document.querySelector('#startHint').textContent")
 
         cdp.call("Page.reload", {"ignoreCache": True})
         wait_for(lambda: cdp.evaluate("document.readyState === 'complete'"), message="preview page reload")
@@ -244,6 +245,10 @@ socks://browser-acceptance-b.invalid:1080#Browser-Acceptance-B`;
         assert "已选择 1 个节点" in cdp.evaluate("document.querySelector('#selectionCount').textContent")
         preview_screenshot = Path(args.screenshot).with_name(Path(args.screenshot).stem + "-preview" + Path(args.screenshot).suffix)
         cdp.screenshot(preview_screenshot)
+        cdp.evaluate("document.querySelector('.control-rail').scrollTop = document.querySelector('.control-rail').scrollHeight")
+        compliance_screenshot = Path(args.screenshot).with_name(Path(args.screenshot).stem + "-compliance" + Path(args.screenshot).suffix)
+        cdp.screenshot(compliance_screenshot)
+        cdp.evaluate("document.querySelector('.control-rail').scrollTop = 0")
 
         previous_theme = cdp.evaluate("document.documentElement.dataset.theme")
         cdp.evaluate("document.querySelector('#themeButton').click()")
@@ -259,6 +264,9 @@ socks://browser-acceptance-b.invalid:1080#Browser-Acceptance-B`;
         light_screenshot = Path(args.screenshot).with_name(Path(args.screenshot).stem + "-light" + Path(args.screenshot).suffix)
         cdp.evaluate("document.querySelector('[data-close=" + json.dumps("settingsModal") + "]').click()")
         cdp.screenshot(light_screenshot)
+        cdp.evaluate("document.querySelector('#authorizationConfirm').click()")
+        assert cdp.evaluate("document.querySelector('#startButton').disabled") is False
+        assert "仅检测已选 1 个节点" in cdp.evaluate("document.querySelector('#startHint').textContent")
         cdp.evaluate("document.querySelector('#startButton').click()")
         generated_task_id = wait_for(
             lambda: cdp.evaluate("sessionStorage.getItem('proxyScope.currentTask')"),
@@ -297,6 +305,15 @@ socks://browser-acceptance-b.invalid:1080#Browser-Acceptance-B`;
         assert cdp.evaluate("!document.querySelector('#emptyState').classList.contains('hidden')")
         assert not cdp.exceptions, cdp.exceptions
 
+        cdp.call("Page.navigate", {"url": f"http://127.0.0.1:{app_port}/legal"})
+        wait_for(lambda: cdp.evaluate("document.readyState === 'complete'"), message="legal page load")
+        assert cdp.evaluate("document.querySelector('h1').textContent") == "合规、隐私与安全边界"
+        assert cdp.evaluate("document.querySelectorAll('.legal-section').length") == 4
+        assert cdp.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth")
+        legal_screenshot = Path(args.screenshot).with_name(Path(args.screenshot).stem + "-legal" + Path(args.screenshot).suffix)
+        cdp.screenshot(legal_screenshot)
+        assert not cdp.exceptions, cdp.exceptions
+
         summary = {
             "status": "passed",
             "viewport": f"{args.width}x{args.height}",
@@ -307,14 +324,18 @@ socks://browser-acceptance-b.invalid:1080#Browser-Acceptance-B`;
             "uiTask": "passed",
             "taskResultRestore": "passed",
             "partialSelection": "passed",
+            "authorizationGate": "passed",
             "historicalMetricContext": "passed",
             "historyRename": "passed",
             "themeAndFontPersistence": "passed",
             "resultFiltering": "passed",
+            "legalPage": "passed",
             "javascriptExceptions": 0,
             "screenshot": str(Path(args.screenshot)),
             "previewScreenshot": str(preview_screenshot),
+            "complianceScreenshot": str(compliance_screenshot),
             "lightScreenshot": str(light_screenshot),
+            "legalScreenshot": str(legal_screenshot),
         }
         print(json.dumps(summary, ensure_ascii=False))
     finally:

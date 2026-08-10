@@ -1,6 +1,14 @@
-# proxy_audit
+# ProxyScope / proxy_audit
+
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+[![Security and tests](https://github.com/zouchenzhen/proxy-audit/actions/workflows/security-and-tests.yml/badge.svg)](https://github.com/zouchenzhen/proxy-audit/actions/workflows/security-and-tests.yml)
 
 Windows 11 下的代理节点批量检测工具。目标是从 v2rayN 备份 / 数据库 / 分享链接中读取节点，使用 sing-box 建立本地代理并真实出站测试，查询出口 IP 的多源情报，最后输出可读报表。
+
+> [!IMPORTANT]
+> 仅检测本人所有、本人管理或已经取得明确测试授权的节点。项目不是节点提供商，不提供公共代理、绕过访问控制或匿名保证。使用前请阅读[合规说明](COMPLIANCE.md)和[隐私说明](PRIVACY.md)。这不是针对具体使用场景的法律意见。
+
+治理与发布文档：[Security Policy](SECURITY.md) · [第三方许可](THIRD_PARTY_NOTICES.md) · [品牌使用](TRADEMARKS.md) · [公开发布检查清单](docs/PUBLIC_RELEASE_CHECKLIST.md) · [Apache-2.0](LICENSE)
 
 ## Web UI（推荐）
 
@@ -27,6 +35,7 @@ Web UI 现已支持：
 - 自动解析 VLESS、VMess、Trojan、Shadowsocks、Hysteria2、TUIC、AnyTLS
 - 在 sing-box 与 Xray 两个检测内核之间选择，并显示本机可用状态
 - 控制并发数、超时、节点上限以及运行前关键字筛选
+- 每次启动任务前确认节点由本人所有或已取得明确测试授权；前端和后端 API 双重校验
 - 在脱敏节点列表中搜索、按协议筛选、逐项勾选、选择当前筛选结果后只检测选中节点
 - 自选 IP-API、ipapi.is、IPinfo、IP2Location、IPQS、Scamalytics、AbuseIPDB
 - 每个收费/限额情报源可保存最多 50 个 Key；后台轮询使用，鉴权失败或额度受限时自动切换
@@ -40,6 +49,23 @@ Web UI 现已支持：
 - 可选延迟/抖动采样，以及默认关闭的 ChatGPT、Claude、GitHub、YouTube 端点探测
 
 > ChatGPT / Claude 等探测只说明指定端点可以访问，不等于账号可用、地区解锁或风控安全，因此不会参与默认质量评分。
+
+## 页面演示
+
+以下截图由隔离验收环境使用 `.invalid` 假节点生成，不含真实订阅、节点凭据、出口 IP 或完整 Key。
+
+![ProxyScope 深色模式节点预览](docs/assets/dashboard-dark-demo.png)
+
+![ProxyScope 授权确认与局部选择](docs/assets/authorization-gate-demo.png)
+
+![ProxyScope 本地合规与隐私页面](docs/assets/legal-privacy-page.png)
+
+<details>
+<summary>查看浅色模式</summary>
+
+![ProxyScope 浅色模式节点预览](docs/assets/dashboard-light-demo.png)
+
+</details>
 
 ### Key 与节点凭据安全
 
@@ -66,6 +92,7 @@ python -m pip install -r requirements.txt
 ```powershell
 python -m pip install -r requirements-dev.txt
 python -m unittest discover -s tests -v
+python scripts/scan_git_history.py
 python tests/ui_browser_acceptance.py
 python tests/real_local_acceptance.py --db "E:\\path\\to\\v2rayN\\guiConfigs\\guiNDB.db"
 ```
@@ -74,7 +101,7 @@ python tests/real_local_acceptance.py --db "E:\\path\\to\\v2rayN\\guiConfigs\\gu
 `ip-api`，且不会输出节点名称、服务器、凭据、订阅地址或出口 IP。节点过期或离线
 会被单独记为节点/上游不可达，不能据此直接判定解析器或内核适配失败。
 
-第二条命令会启动隔离的本地后端和无头 Chrome，真实点击设置、导入、任务、筛选等 UI，并检查布局是否溢出或重叠。
+第四条命令会启动隔离的本地后端和无头 Chrome，真实点击设置、导入、授权确认、任务、筛选等 UI，并检查布局是否溢出或重叠。
 
 ## 当前能力与验收边界
 
@@ -114,8 +141,8 @@ python tests/real_local_acceptance.py --db "E:\\path\\to\\v2rayN\\guiConfigs\\gu
 ```text
 proxy_audit/
 ├─ bin/
-│  ├─ sing-box.exe
-│  └─ xray.exe                 # 可选，也可在 Web 设置中指定
+│  ├─ sing-box.exe             # 运行时下载，不进入 Git
+│  └─ xray.exe                 # 可选，不进入 Git；也可在 Web 设置中指定
 ├─ web/
 │  ├─ index.html
 │  ├─ styles.css
@@ -131,6 +158,17 @@ proxy_audit/
 │  ├─ lib_secrets.py
 │  └─ lib_report.py
 ├─ tests/
+├─ docs/
+│  ├─ assets/                   # 仅含合成数据的页面演示图
+│  └─ PUBLIC_RELEASE_CHECKLIST.md
+├─ .github/workflows/
+├─ LICENSE                      # Apache License 2.0
+├─ NOTICE
+├─ COMPLIANCE.md
+├─ PRIVACY.md
+├─ SECURITY.md
+├─ THIRD_PARTY_NOTICES.md
+├─ TRADEMARKS.md
 ├─ start-web.cmd
 ├─ start-web.ps1
 ├─ requirements.txt
@@ -150,7 +188,7 @@ proxy_audit/
 ## 环境要求
 
 - Windows 11
-- Python 3.x
+- Python 3.10+
 - `<项目目录>/bin/sing-box.exe`，或在 Web 设置中指定路径
 - Xray 为可选第二内核；可放入 `bin/xray.exe` 或指定现有 v2rayN 内核路径
 - 可访问外网
@@ -262,46 +300,20 @@ python scripts/proxy_audit_batch.py --v2ray-backup "E:/backup/v2ray_backup_26_03
 ## 对已有结果补画像
 
 ```powershell
-python scripts/enhance_existing_run.py --input-raw "E:/Openclaw_Workspace/proxy_audit/results/raw/run_20260319_201919.json"
+python scripts/enhance_existing_run.py --input-raw "results/raw/run_YYYYMMDD_HHMMSS.json"
 ```
 
 ## 生成成功节点汇总与 shortlist
 
 ```powershell
-python scripts/generate_success_reports.py --stamp 20260320_1434
+python scripts/generate_success_reports.py --stamp 20260810_1200
 ```
 
-输出文件会自动带上当前统计数量，例如：
-- `success_nodes_full_53_20260320_1434.json`
-- `success_nodes_full_53_20260320_1434.csv`
-- `success_nodes_shortlist_34_20260320_1434.json`
-- `success_nodes_shortlist_34_20260320_1434.csv`
-
-## 当前重要结果文件
-
-### VLESS 增强画像结果
-- `E:/Openclaw_Workspace/proxy_audit/results/raw/run_20260319_201919_enhanced.json`
-- `E:/Openclaw_Workspace/proxy_audit/results/csv/run_20260319_201919_enhanced.csv`
-- `E:/Openclaw_Workspace/proxy_audit/results/reports/run_20260319_201919_enhanced.md`
-
-### 成功有效节点总表（最新稳定版）
-- `E:/Openclaw_Workspace/proxy_audit/results/reports/success_nodes_full_53_20260320_1434.json`
-- `E:/Openclaw_Workspace/proxy_audit/results/reports/success_nodes_full_53_20260320_1434.csv`
-
-### 成功节点 shortlist（最新稳定版）
-- `E:/Openclaw_Workspace/proxy_audit/results/reports/success_nodes_shortlist_34_20260320_1434.json`
-- `E:/Openclaw_Workspace/proxy_audit/results/reports/success_nodes_shortlist_34_20260320_1434.csv`
-
-## 当前支持状态
-
-### 已有真实成功样本
-- VLESS
-- VMess
-- AnyTLS
-- Hysteria2
-
-### 已接入但当前样本未成功
-- TUIC
+输出文件会自动带上当前统计数量，命名形如：
+- `success_nodes_full_<count>_<stamp>.json`
+- `success_nodes_full_<count>_<stamp>.csv`
+- `success_nodes_shortlist_<count>_<stamp>.json`
+- `success_nodes_shortlist_<count>_<stamp>.csv`
 
 ## 运行原理概述
 
@@ -317,9 +329,8 @@ python scripts/generate_success_reports.py --stamp 20260320_1434
 
 - 节点“成功”仅代表当前协议映射、sing-box 配置、实际出站链路在本次测试中成立。
 - 不同供应商对风险 / 代理 / 机房的判断口径不同，建议结合原始源数据一起看。
-- TUIC 当前虽已接入，但你现有 2 条样本未开通，因此没有成功样本。
 - 部分节点备注存在历史编码问题，不影响主要测试逻辑，但会影响显示效果。
-- 成功节点不等于“家宽精品节点”，当前成功池里仍有不少 datacenter / proxy_or_transit。
+- 成功节点不等于“家宽精品节点”，结果仍可能被情报源判定为 datacenter / proxy_or_transit。
 
 ## 建议使用流程
 
@@ -327,29 +338,16 @@ python scripts/generate_success_reports.py --stamp 20260320_1434
 - 批量跑完后优先看 `results/csv/` 和 `results/reports/`
 - 需要进一步筛节点时，直接看 `success_nodes_shortlist_*.csv`
 
-## 后续可继续完善的方向
-
-- 继续扩大 VMess / Hysteria2 验证范围
-- 深挖 TUIC 正式成功样本
-- 补充更多协议支持
-- 增加更清晰的“精品节点筛选规则”
-
 ## FAQ / 注意事项
 
 ### 1. 为什么 PowerShell 里看 README / CHANGELOG 会乱码？
 通常是终端编码显示问题，不一定是文件本身坏了。优先用 VS Code、Notepad++ 或支持 UTF-8 的编辑器打开。
 
-### 2. 为什么 success 汇总文件会有多个版本？
-因为项目前期有过临时生成阶段。现在以最新稳定版为准：
-- `success_nodes_full_53_20260320_1438.*`
-- `success_nodes_shortlist_34_20260320_1438.*`
-旧版本已移动到 `results/reports/archive/`。
-
-### 3. 如何重新生成最新 success 汇总？
-```powershell
-python scripts/generate_success_reports.py --stamp 20260320_1438
-```
-如果你想换时间戳，把 `20260320_1438` 改成你自己的即可。
-
-### 4. 成功节点是不是就等于精品节点？
+### 2. 成功节点是不是就等于精品节点？
 不是。成功只代表当前测试链路跑通。是否值得留用，还要结合 `ip_type_final`、风险分数和原始情报看。
+
+## 许可证
+
+本项目自有代码采用 [Apache License 2.0](LICENSE)。该许可证允许使用、修改、分发和商业使用，并包含明确的专利授权与 NOTICE 保留要求。
+
+sing-box、Xray-core、Python 依赖和外部 IP 情报服务不因此变为 Apache-2.0；详情见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。当前官方仓库不分发检测内核二进制、不运营公共 SaaS、不收费提供检测，也不推广节点。

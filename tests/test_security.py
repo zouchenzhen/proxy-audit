@@ -12,11 +12,18 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import lib_secrets
 import lib_tasks
 import lib_ipintel
+import scan_git_history
 from lib_report import build_summary_rows
 from lib_tasks import TaskManager
 
 
 class SecureSettingsTests(unittest.TestCase):
+    def test_history_scanner_detects_secret_without_retaining_value(self):
+        secret = "_".join(("SYNTHETIC", "TOKEN", "SHOULD", "BE", "DETECTED", "123"))
+        findings = scan_git_history.scan_bytes("worktree", "sample.txt", f'api_key = "{secret}"'.encode())
+        self.assertEqual(findings[0][0], "assigned-secret")
+        self.assertNotIn(secret, repr(findings))
+
     def test_save_load_and_clear_legacy_value(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -158,9 +165,17 @@ class ResultRedactionTests(unittest.TestCase):
         ], "selection test")
         selected_id = imported["preview"][1]["node_id"]
         with patch.object(lib_tasks.threading.Thread, "start", return_value=None):
-            task = manager.start_task({"import_id": imported["id"], "node_ids": [selected_id], "providers": ["ip_api"]})
+            task = manager.start_task({"import_id": imported["id"], "node_ids": [selected_id], "providers": ["ip_api"], "authorization_confirmed": True})
         self.assertEqual(task["total"], 1)
         self.assertEqual(task["protocols"], {"trojan": 1})
+
+    def test_task_requires_explicit_authorization_confirmation(self):
+        manager = TaskManager(history_limit=1)
+        imported = manager.add_import([
+            {"remark": "owned", "protocol": "vless", "server": "example.invalid", "server_port": 443},
+        ], "authorization test")
+        with self.assertRaisesRegex(ValueError, "授权"):
+            manager.start_task({"import_id": imported["id"], "providers": ["ip_api"]})
 
     def test_history_limit_only_controls_index_and_does_not_delete_files(self):
         with tempfile.TemporaryDirectory() as directory:

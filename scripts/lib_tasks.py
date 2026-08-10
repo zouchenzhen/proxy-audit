@@ -105,6 +105,8 @@ class TaskManager:
             return [self.public_import(record, include_preview=False) for record in records]
 
     def start_task(self, spec: Dict[str, Any]) -> Dict[str, Any]:
+        if spec.get("authorization_confirmed") is not True:
+            raise ValueError("请先确认：待测节点由本人所有或已取得明确测试授权")
         imported = self.get_import(str(spec.get("import_id") or ""))
         if not imported:
             raise ValueError("Imported node set not found; please import nodes again")
@@ -143,6 +145,8 @@ class TaskManager:
             "progress": 0.0,
             "protocols": protocol_counts(selected),
             "settings": {
+                "authorization_confirmed": True,
+                "compliance_notice_version": "2026-08-10",
                 "timeout": max(4, min(int(spec.get("timeout") or 15), 90)),
                 "concurrency": max(1, min(int(spec.get("concurrency") or 2), 8)),
                 "providers": providers,

@@ -242,6 +242,7 @@ async function importNodes() {
     state.currentTask = null;
     state.selectedNodeIds.clear();
     state.page = 1;
+    $("#authorizationConfirm").checked = false;
     sessionStorage.setItem(SESSION_IMPORT_KEY, state.imported.id);
     sessionStorage.removeItem(SESSION_TASK_KEY);
     ["resultSearch","statusFilter","riskFilter","typeFilter"].forEach(id => $("#" + id).value = "");
@@ -264,7 +265,6 @@ function renderImport() {
   $("#metricImported").textContent = state.imported.total;
   $("#metricImportedLabel").textContent = "已导入";
   $("#metricProtocols").textContent = Object.keys(state.imported.protocols || {}).join(" / ");
-  $("#startButton").disabled = false;
   updateSelectionSummary();
   populateProtocolFilter(Object.keys(state.imported.protocols || {}));
   if (!state.currentTask) {
@@ -285,15 +285,28 @@ function renderImport() {
 
 function selectedValues(selector) { return $$(selector).filter(input => input.checked).map(input => input.value); }
 
+function syncStartAvailability() {
+  const active = ["queued","running","cancelling"].includes(state.currentTask?.status);
+  const authorized = Boolean($("#authorizationConfirm")?.checked);
+  $("#startButton").disabled = !state.imported || !authorized || active;
+  if (!state.imported) $("#startHint").textContent = "请先导入节点";
+  else if (!authorized) $("#startHint").textContent = "请先确认节点授权";
+  else {
+    const count = state.selectedNodeIds.size;
+    $("#startHint").textContent = count ? `仅检测已选 ${count} 个节点` : `${state.imported.total} 个节点待检测`;
+  }
+}
+
 function updateSelectionSummary(filteredCount = null) {
   const count = state.selectedNodeIds.size;
   if ($("#selectionCount")) $("#selectionCount").textContent = count ? `已选择 ${count} 个节点` : "尚未手动选择（默认检测全部）";
   if ($("#selectionFiltered")) $("#selectionFiltered").textContent = filteredCount == null ? "" : `当前筛选 ${filteredCount} 个`;
-  if ($("#startHint") && state.imported) $("#startHint").textContent = count ? `仅检测已选 ${count} 个节点` : `${state.imported.total} 个节点待检测`;
+  syncStartAvailability();
 }
 
 async function startTask() {
   if (!state.imported) return toast("请先导入节点", "error");
+  if (!$("#authorizationConfirm").checked) return toast("请先确认节点由本人所有或已取得测试授权", "error");
   const kernel = $('input[name=kernel]:checked')?.value;
   if (!kernel) return toast("没有可用的检测内核", "error");
   const payload = {
@@ -307,11 +320,13 @@ async function startTask() {
     search: $("#preFilter").value.trim(),
     limit: Number($("#nodeLimit").value || 0),
     node_ids: [...state.selectedNodeIds],
+    authorization_confirmed: true,
   };
   if (!payload.providers.length) return toast("请至少选择一个 IP 情报源", "error");
   try {
     state.currentTask = await api("/api/tasks", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
     sessionStorage.setItem(SESSION_TASK_KEY, state.currentTask.id);
+    $("#authorizationConfirm").checked = false;
     $("#startButton").disabled = true;
     $("#cancelButton").classList.remove("hidden");
     renderTask();
@@ -333,7 +348,7 @@ async function pollTask() {
     const active = ["queued","running","cancelling"].includes(state.currentTask.status);
     if (active) schedulePoll();
     else {
-      $("#startButton").disabled = !state.imported;
+      syncStartAvailability();
       $("#cancelButton").classList.add("hidden");
       await loadHistory();
     }
@@ -566,6 +581,7 @@ function bindEvents() {
   initDropZone();
   $("#importButton").addEventListener("click", importNodes);
   $("#startButton").addEventListener("click", startTask);
+  $("#authorizationConfirm").addEventListener("change", syncStartAvailability);
   $("#cancelButton").addEventListener("click", cancelTask);
   $("#refreshButton").addEventListener("click", () => state.currentTask ? pollTask() : loadHistory());
   $("#settingsButton").addEventListener("click", () => openModal("settingsModal"));

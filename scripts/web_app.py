@@ -50,9 +50,13 @@ def create_app(testing: bool = False) -> Flask:
     def index():
         return send_from_directory(WEB_DIR, "index.html")
 
+    @app.get("/legal")
+    def legal():
+        return send_from_directory(WEB_DIR, "legal.html")
+
     @app.get("/api/health")
     def health():
-        return jsonify({"ok": True, "version": "2.1.0", "time": time.time()})
+        return jsonify({"ok": True, "version": "2.2.0", "time": time.time()})
 
     @app.get("/api/system")
     def system_info():

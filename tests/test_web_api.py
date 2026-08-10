@@ -23,6 +23,19 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual({item["id"] for item in system["kernels"]}, {"sing-box", "xray"})
         self.assertNotIn("ipqs_api_key", system["settings"])
 
+    def test_local_legal_page_and_authorization_gate(self):
+        legal = self.client.get("/legal")
+        self.assertEqual(legal.status_code, 200)
+        self.assertIn("合规、隐私与安全边界", legal.get_data(as_text=True))
+        legal.close()
+        imported = self.client.post(
+            "/api/import",
+            data={"source_type": "paste", "content": "vless://00000000-0000-0000-0000-000000000009@example.invalid:443#Owned"},
+        ).get_json()
+        denied = self.client.post("/api/tasks", json={"import_id": imported["id"], "providers": ["ip_api"]})
+        self.assertEqual(denied.status_code, 400)
+        self.assertIn("授权", denied.get_json()["error"])
+
     def test_import_pasted_links_redacts_credentials(self):
         link = "vless://00000000-0000-0000-0000-000000000099@example.com:443?security=tls#WebTest"
         response = self.client.post("/api/import", data={"source_type":"paste", "content":link})

@@ -1,0 +1,9 @@
+ProxyScope / proxy_audit
+Copyright 2026 zouchenzhen and contributors
+
+This product is licensed under the Apache License, Version 2.0.
+
+This repository can interoperate with or download separately distributed
+third-party software and can call third-party network services. Those works
+and services are not relicensed under Apache-2.0. See
+THIRD_PARTY_NOTICES.md for attribution and license information.
