@@ -1,4 +1,4 @@
-# ProxyScope / proxy_audit
+# Proxy Audit
 
 [简体中文](README.md) | [English](README_EN.md)
 
@@ -25,7 +25,7 @@ cd proxy-audit
 也可以在 PowerShell 中运行：
 
 ```powershell
-cd E:/Openclaw_Workspace/proxy_audit
+cd proxy-audit
 ./start-web.ps1
 ```
 
@@ -56,16 +56,16 @@ Web UI 现已支持：
 
 以下截图由隔离验收环境使用 `.invalid` 假节点生成，不含真实订阅、节点凭据、出口 IP 或完整 Key。
 
-![ProxyScope 深色模式节点预览](docs/assets/dashboard-dark-demo.png)
+![Proxy Audit 深色模式节点预览](docs/assets/dashboard-dark-demo.png)
 
-![ProxyScope 授权确认与局部选择](docs/assets/authorization-gate-demo.png)
+![Proxy Audit 授权确认与局部选择](docs/assets/authorization-gate-demo.png)
 
-![ProxyScope 本地合规与隐私页面](docs/assets/legal-privacy-page.png)
+![Proxy Audit 本地使用与隐私页面](docs/assets/legal-privacy-page.png)
 
 <details>
 <summary>查看浅色模式</summary>
 
-![ProxyScope 浅色模式节点预览](docs/assets/dashboard-light-demo.png)
+![Proxy Audit 浅色模式节点预览](docs/assets/dashboard-light-demo.png)
 
 </details>
 
@@ -141,7 +141,7 @@ python tests/real_local_acceptance.py --db "E:\\path\\to\\v2rayN\\guiConfigs\\gu
 ## 目录结构
 
 ```text
-proxy_audit/
+proxy-audit/
 ├─ bin/
 │  ├─ sing-box.exe             # 运行时下载，不进入 Git
 │  └─ xray.exe                 # 可选，不进入 Git；也可在 Web 设置中指定
@@ -199,7 +199,7 @@ proxy_audit/
 推荐先进入项目目录：
 
 ```powershell
-cd E:/Openclaw_Workspace/proxy_audit
+cd proxy-audit
 ```
 
 ## 配置文件

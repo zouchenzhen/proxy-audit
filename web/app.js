@@ -15,10 +15,24 @@ const state = {
   renameTaskId: null,
 };
 
-const UI_THEME_KEY = "proxyScope.theme";
-const UI_FONT_KEY = "proxyScope.fontSize";
-const SESSION_IMPORT_KEY = "proxyScope.currentImport";
-const SESSION_TASK_KEY = "proxyScope.currentTask";
+const UI_THEME_KEY = "proxyAudit.theme";
+const UI_FONT_KEY = "proxyAudit.fontSize";
+const SESSION_IMPORT_KEY = "proxyAudit.currentImport";
+const SESSION_TASK_KEY = "proxyAudit.currentTask";
+
+function migrateLegacyStorage() {
+  [
+    [localStorage, "proxyScope.theme", UI_THEME_KEY],
+    [localStorage, "proxyScope.fontSize", UI_FONT_KEY],
+    [sessionStorage, "proxyScope.currentImport", SESSION_IMPORT_KEY],
+    [sessionStorage, "proxyScope.currentTask", SESSION_TASK_KEY],
+  ].forEach(([storage, legacyKey, currentKey]) => {
+    if (storage.getItem(currentKey) === null && storage.getItem(legacyKey) !== null) {
+      storage.setItem(currentKey, storage.getItem(legacyKey));
+    }
+    storage.removeItem(legacyKey);
+  });
+}
 
 const keyLabels = {
   ipinfo_api_key: "IPinfo API Token",
@@ -626,6 +640,7 @@ function bindEvents() {
 }
 
 async function boot() {
+  migrateLegacyStorage();
   applyPreferences();
   bindEvents();
   await loadSystem();

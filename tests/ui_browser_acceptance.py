@@ -106,10 +106,11 @@ class CDP:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Real-browser acceptance test for ProxyScope Web UI")
+    parser = argparse.ArgumentParser(description="Real-browser acceptance test for Proxy Audit Web UI")
     parser.add_argument("--width", type=int, default=1536)
     parser.add_argument("--height", type=int, default=700)
     parser.add_argument("--screenshot", default=str(ROOT / "temp" / "ui-browser-acceptance.png"))
+    parser.add_argument("--write-demo-assets", action="store_true", help="refresh README screenshots using synthetic .invalid nodes")
     args = parser.parse_args()
 
     app_port = free_port()
@@ -170,6 +171,20 @@ def main():
         cdp.call("Page.navigate", {"url": f"http://127.0.0.1:{app_port}/"})
         wait_for(lambda: cdp.evaluate("document.readyState === 'complete'"), message="page load")
         wait_for(lambda: cdp.evaluate("document.querySelector('#healthText')?.textContent === '本地引擎已连接'"), message="system API render")
+        assert cdp.evaluate("document.title") == "Proxy Audit · 节点 IP 质量审计"
+        assert cdp.evaluate("document.querySelector('.brand strong').textContent") == "Proxy Audit"
+        legacy_storage = cdp.evaluate("""
+          (() => {
+            localStorage.removeItem('proxyAudit.theme');
+            localStorage.setItem('proxyScope.theme', 'dark');
+            migrateLegacyStorage();
+            return {
+              migrated: localStorage.getItem('proxyAudit.theme'),
+              legacyRemoved: localStorage.getItem('proxyScope.theme') === null,
+            };
+          })()
+        """)
+        assert legacy_storage == {"migrated": "dark", "legacyRemoved": True}, legacy_storage
 
         geometry = cdp.evaluate("""
           (() => {
@@ -261,9 +276,13 @@ socks://demo-jp.invalid:1080#Demo-JP-Node-02`;
         assert "已选择 1 个节点" in cdp.evaluate("document.querySelector('#selectionCount').textContent")
         preview_screenshot = Path(args.screenshot).with_name(Path(args.screenshot).stem + "-preview" + Path(args.screenshot).suffix)
         cdp.screenshot(preview_screenshot)
+        if args.write_demo_assets:
+            cdp.screenshot(ROOT / "docs" / "assets" / "dashboard-dark-demo.png")
         cdp.evaluate("document.querySelector('.control-rail').scrollTop = document.querySelector('.control-rail').scrollHeight")
         compliance_screenshot = Path(args.screenshot).with_name(Path(args.screenshot).stem + "-compliance" + Path(args.screenshot).suffix)
         cdp.screenshot(compliance_screenshot)
+        if args.write_demo_assets:
+            cdp.screenshot(ROOT / "docs" / "assets" / "authorization-gate-demo.png")
         cdp.evaluate("document.querySelector('.control-rail').scrollTop = 0")
 
         previous_theme = cdp.evaluate("document.documentElement.dataset.theme")
@@ -282,12 +301,14 @@ socks://demo-jp.invalid:1080#Demo-JP-Node-02`;
         light_screenshot = Path(args.screenshot).with_name(Path(args.screenshot).stem + "-light" + Path(args.screenshot).suffix)
         cdp.evaluate("document.querySelector('[data-close=" + json.dumps("settingsModal") + "]').click()")
         cdp.screenshot(light_screenshot)
+        if args.write_demo_assets:
+            cdp.screenshot(ROOT / "docs" / "assets" / "dashboard-light-demo.png")
         cdp.evaluate("document.querySelector('#authorizationConfirm').click()")
         assert cdp.evaluate("document.querySelector('#startButton').disabled") is False
         assert "仅检测已选 1 个节点" in cdp.evaluate("document.querySelector('#startHint').textContent")
         cdp.evaluate("document.querySelector('#startButton').click()")
         generated_task_id = wait_for(
-            lambda: cdp.evaluate("sessionStorage.getItem('proxyScope.currentTask')"),
+            lambda: cdp.evaluate("sessionStorage.getItem('proxyAudit.currentTask')"),
             message="acceptance task id",
         )
         wait_for(
@@ -305,7 +326,7 @@ socks://demo-jp.invalid:1080#Demo-JP-Node-02`;
         assert cdp.evaluate("document.querySelector('#metricImported').textContent") == "1"
         assert cdp.evaluate("document.documentElement.dataset.theme") == "light"
         assert cdp.evaluate("document.documentElement.dataset.fontSize") == "xlarge"
-        cdp.evaluate("document.querySelector(`[data-rename-task='${sessionStorage.getItem('proxyScope.currentTask')}']`).click()")
+        cdp.evaluate("document.querySelector(`[data-rename-task='${sessionStorage.getItem('proxyAudit.currentTask')}']`).click()")
         wait_for(lambda: cdp.evaluate("!document.querySelector('#renameModal').classList.contains('hidden')"), message="rename modal")
         cdp.evaluate("document.querySelector('#renameTaskInput').value = 'Browser renamed history'; document.querySelector('#saveTaskName').click()")
         wait_for(lambda: cdp.evaluate("document.querySelector('#historyList').textContent.includes('Browser renamed history')"), message="renamed history")
@@ -325,11 +346,14 @@ socks://demo-jp.invalid:1080#Demo-JP-Node-02`;
 
         cdp.call("Page.navigate", {"url": f"http://127.0.0.1:{app_port}/legal"})
         wait_for(lambda: cdp.evaluate("document.readyState === 'complete'"), message="legal page load")
+        assert cdp.evaluate("document.title") == "Proxy Audit · 使用与隐私说明"
         assert cdp.evaluate("document.querySelector('h1').textContent") == "使用、隐私与安全边界"
         assert cdp.evaluate("document.querySelectorAll('.legal-section').length") == 4
         assert cdp.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth")
         legal_screenshot = Path(args.screenshot).with_name(Path(args.screenshot).stem + "-legal" + Path(args.screenshot).suffix)
         cdp.screenshot(legal_screenshot)
+        if args.write_demo_assets:
+            cdp.screenshot(ROOT / "docs" / "assets" / "legal-privacy-page.png")
         assert not cdp.exceptions, cdp.exceptions
 
         summary = {

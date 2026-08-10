@@ -1,14 +1,14 @@
-# ProxyScope / proxy_audit
+# Proxy Audit
 
 [简体中文](README.md) | [English](README_EN.md)
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![Security and tests](https://github.com/zouchenzhen/proxy-audit/actions/workflows/security-and-tests.yml/badge.svg)](https://github.com/zouchenzhen/proxy-audit/actions/workflows/security-and-tests.yml)
 
-ProxyScope is a local Windows application for batch-testing proxy node connectivity and exit-IP quality. It imports v2rayN backups, databases, subscriptions, and share links; runs real outbound checks through sing-box or Xray; enriches exit IPs with multiple intelligence providers; and presents searchable, filterable results in a Web UI.
+Proxy Audit is a local Windows application for batch-testing proxy node connectivity and exit-IP quality. It imports v2rayN backups, databases, subscriptions, and share links; runs real outbound checks through sing-box or Xray; enriches exit IPs with multiple intelligence providers; and presents searchable, filterable results in a Web UI.
 
 > [!IMPORTANT]
-> Test only assets that you own, manage, or have explicit permission to test. Follow applicable local laws and third-party service terms. ProxyScope is not a node provider and does not offer a public proxy service, access-control bypass, or anonymity guarantee.
+> Test only assets that you own, manage, or have explicit permission to test. Follow applicable local laws and third-party service terms. Proxy Audit is not a node provider and does not offer a public proxy service, access-control bypass, or anonymity guarantee.
 
 ## Quick start
 
@@ -46,14 +46,14 @@ You can also start it from PowerShell:
 
 All screenshots below were generated in an isolated acceptance environment with synthetic `.invalid` nodes. They contain no real subscriptions, credentials, exit IPs, or complete API keys.
 
-![ProxyScope dark dashboard](docs/assets/dashboard-dark-demo.png)
+![Proxy Audit dark dashboard](docs/assets/dashboard-dark-demo.png)
 
-![ProxyScope authorization and partial selection](docs/assets/authorization-gate-demo.png)
+![Proxy Audit authorization and partial selection](docs/assets/authorization-gate-demo.png)
 
 <details>
 <summary>Light theme</summary>
 
-![ProxyScope light dashboard](docs/assets/dashboard-light-demo.png)
+![Proxy Audit light dashboard](docs/assets/dashboard-light-demo.png)
 
 </details>
 

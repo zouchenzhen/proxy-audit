@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from typing import Dict, Any, List, Tuple
 
-ROOT = Path(r"E:/Openclaw_Workspace/proxy_audit")
+ROOT = Path(__file__).resolve().parents[1]
 RAW_DIR = ROOT / 'results' / 'raw'
 REPORT_DIR = ROOT / 'results' / 'reports'
 

@@ -11,7 +11,7 @@ Set-Location -LiteralPath $projectRoot
 
 $venvPython = Join-Path $projectRoot '.venv\Scripts\python.exe'
 if (-not (Test-Path -LiteralPath $venvPython)) {
-    Write-Host '[ProxyScope] 正在创建隔离 Python 环境…' -ForegroundColor Cyan
+    Write-Host '[Proxy Audit] 正在创建隔离 Python 环境…' -ForegroundColor Cyan
     $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
     if ($pyLauncher) {
         & $pyLauncher.Source -3 -m venv (Join-Path $projectRoot '.venv')
@@ -29,7 +29,7 @@ if (-not (Test-Path -LiteralPath $venvPython)) {
 
 & $venvPython -c "import flask, requests, socks" 2>$null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host '[ProxyScope] 正在安装 Python 依赖…' -ForegroundColor Cyan
+    Write-Host '[Proxy Audit] 正在安装 Python 依赖…' -ForegroundColor Cyan
     & $venvPython -m pip install -r (Join-Path $projectRoot 'requirements.txt')
     if ($LASTEXITCODE -ne 0) { throw 'Python 依赖安装失败，请检查网络后重试。' }
 }
@@ -42,7 +42,7 @@ if (-not $SkipCoreDownload -and -not (Test-Path -LiteralPath $singBox)) {
     $archive = Join-Path $downloadRoot 'sing-box.zip'
     $extractRoot = Join-Path $downloadRoot 'extract'
     New-Item -ItemType Directory -Force -Path $downloadRoot, $extractRoot, (Split-Path -Parent $singBox) | Out-Null
-    Write-Host '[ProxyScope] 正在从官方发行页下载 sing-box…' -ForegroundColor Cyan
+    Write-Host '[Proxy Audit] 正在从官方发行页下载 sing-box…' -ForegroundColor Cyan
     Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/SagerNet/sing-box/releases/download/v$version/sing-box-$version-windows-amd64.zip" -OutFile $archive
     $actualSha256 = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
     if ($actualSha256 -ne $expectedSha256) {
@@ -58,5 +58,5 @@ if (-not $SkipCoreDownload -and -not (Test-Path -LiteralPath $singBox)) {
 
 $webArguments = @('scripts/web_app.py', '--port', $Port)
 if ($NoOpen) { $webArguments += '--no-open' }
-Write-Host "[ProxyScope] 启动本地面板：http://127.0.0.1:$Port" -ForegroundColor Green
+Write-Host "[Proxy Audit] 启动本地面板：http://127.0.0.1:$Port" -ForegroundColor Green
 & $venvPython @webArguments
