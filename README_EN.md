@@ -121,6 +121,12 @@ python tests/real_local_acceptance.py --db "C:\path\to\v2rayN\guiConfigs\guiNDB.
 - ChatGPT, Claude, GitHub, and YouTube probes report endpoint reachability only; they do not guarantee account availability, regional eligibility, or freedom from platform risk controls.
 - Third-party subscriptions, IP intelligence APIs, test endpoints, sing-box, and Xray remain subject to their own terms and licenses.
 
+## Community
+
+[LINUX DO — Chinese Developer Community](https://linux.do/)
+
+This project recognizes and appreciates LINUX DO's contribution to open-source exchange, project sharing, and technical discussion among Chinese-speaking developers. Unless the community explicitly states otherwise, this is an acknowledgment and link only, not an official endorsement.
+
 ## License and third-party software
 
 Original project code is licensed under the [Apache License 2.0](LICENSE), including its patent grant and NOTICE requirements.

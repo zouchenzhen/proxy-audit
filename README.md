@@ -261,19 +261,19 @@ cd proxy-audit
 ### 1. v2rayN 备份 ZIP
 
 ```powershell
-python scripts/proxy_audit_batch.py --v2ray-backup "E:/backup/v2ray_backup_26_0319.zip"
+python scripts/proxy_audit_batch.py --v2ray-backup "C:/path/to/v2ray_backup.zip"
 ```
 
 ### 2. v2rayN 数据库 `guiNDB.db`
 
 ```powershell
-python scripts/proxy_audit_batch.py --v2ray-db "E:/path/to/guiNDB.db"
+python scripts/proxy_audit_batch.py --v2ray-db "C:/path/to/guiNDB.db"
 ```
 
 ### 3. 分享链接文件
 
 ```powershell
-python scripts/proxy_audit_batch.py --input-file "E:/path/to/nodes.txt"
+python scripts/proxy_audit_batch.py --input-file "C:/path/to/nodes.txt"
 ```
 
 ## 常用运行方式
@@ -281,41 +281,41 @@ python scripts/proxy_audit_batch.py --input-file "E:/path/to/nodes.txt"
 ### 全量运行所有节点
 
 ```powershell
-python scripts/proxy_audit_batch.py --v2ray-backup "E:/backup/v2ray_backup_26_0319.zip"
+python scripts/proxy_audit_batch.py --v2ray-backup "C:/path/to/v2ray_backup.zip"
 ```
 
 ### 只跑某个协议
 
 ```powershell
-python scripts/proxy_audit_batch.py --v2ray-backup "E:/backup/v2ray_backup_26_0319.zip" --protocols vless
-python scripts/proxy_audit_batch.py --v2ray-backup "E:/backup/v2ray_backup_26_0319.zip" --protocols vmess
-python scripts/proxy_audit_batch.py --v2ray-backup "E:/backup/v2ray_backup_26_0319.zip" --protocols anytls
-python scripts/proxy_audit_batch.py --v2ray-backup "E:/backup/v2ray_backup_26_0319.zip" --protocols hysteria2
-python scripts/proxy_audit_batch.py --v2ray-backup "E:/backup/v2ray_backup_26_0319.zip" --protocols tuic
+python scripts/proxy_audit_batch.py --v2ray-backup "C:/path/to/v2ray_backup.zip" --protocols vless
+python scripts/proxy_audit_batch.py --v2ray-backup "C:/path/to/v2ray_backup.zip" --protocols vmess
+python scripts/proxy_audit_batch.py --v2ray-backup "C:/path/to/v2ray_backup.zip" --protocols anytls
+python scripts/proxy_audit_batch.py --v2ray-backup "C:/path/to/v2ray_backup.zip" --protocols hysteria2
+python scripts/proxy_audit_batch.py --v2ray-backup "C:/path/to/v2ray_backup.zip" --protocols tuic
 ```
 
 ### 同时跑多个协议
 
 ```powershell
-python scripts/proxy_audit_batch.py --v2ray-backup "E:/backup/v2ray_backup_26_0319.zip" --protocols vless,vmess,anytls,hysteria2,tuic
+python scripts/proxy_audit_batch.py --v2ray-backup "C:/path/to/v2ray_backup.zip" --protocols vless,vmess,anytls,hysteria2,tuic
 ```
 
 ### 小批量验证
 
 ```powershell
-python scripts/proxy_audit_batch.py --v2ray-backup "E:/backup/v2ray_backup_26_0319.zip" --protocols vmess --limit 5
+python scripts/proxy_audit_batch.py --v2ray-backup "C:/path/to/v2ray_backup.zip" --protocols vmess --limit 5
 ```
 
 ### 按关键词筛选
 
 ```powershell
-python scripts/proxy_audit_batch.py --v2ray-backup "E:/backup/v2ray_backup_26_0319.zip" --filter-substring "JP"
+python scripts/proxy_audit_batch.py --v2ray-backup "C:/path/to/v2ray_backup.zip" --filter-substring "JP"
 ```
 
 ### 指定起始端口 / 超时
 
 ```powershell
-python scripts/proxy_audit_batch.py --v2ray-backup "E:/backup/v2ray_backup_26_0319.zip" --start-port 22080 --timeout 20
+python scripts/proxy_audit_batch.py --v2ray-backup "C:/path/to/v2ray_backup.zip" --start-port 22080 --timeout 20
 ```
 
 ## 输出文件位置
@@ -376,6 +376,12 @@ python scripts/generate_success_reports.py --stamp 20260810_1200
 
 ### 2. 成功节点是不是就等于精品节点？
 不是。成功只代表当前测试链路跑通。是否值得留用，还要结合 `ip_type_final`、风险分数和原始情报看。
+
+## 社区
+
+[LINUX DO — 中文开发者社区](https://linux.do/)
+
+本项目认可并感谢 LINUX DO 社区在中文开发者开源交流、项目分享和技术讨论中的价值。除非社区另有明确说明，此处仅为社区致谢和链接，不代表官方背书。
 
 ## 许可证
 
