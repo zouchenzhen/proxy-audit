@@ -1,11 +1,12 @@
 import json
 import statistics
+import threading
 import time
 from typing import Any, Dict, List, Optional
 
 import requests
 
-from lib_secrets import load_settings
+from lib_secrets import load_settings, normalize_secret_values, secret_id
 
 
 PROVIDER_META = [
@@ -24,6 +25,64 @@ SERVICE_TARGETS = {
     "github": ("GitHub", "https://github.com/favicon.ico"),
     "youtube": ("YouTube", "https://www.youtube.com/generate_204"),
 }
+
+
+class ProviderKeyUnavailable(RuntimeError):
+    pass
+
+
+_KEY_POOL_LOCK = threading.Lock()
+_KEY_POOL_CURSOR: Dict[str, int] = {}
+_KEY_POOL_COOLDOWN: Dict[str, float] = {}
+
+
+def _provider_payload_ok(data: Dict[str, Any]) -> bool:
+    if data.get("success") is False:
+        return False
+    if data.get("error"):
+        return False
+    return str(data.get("status") or "").lower() not in {"error", "fail", "failed"}
+
+
+def _ordered_pool_keys(field: str, cfg: Dict[str, Any]) -> List[str]:
+    keys = normalize_secret_values(cfg.get(field))
+    if not keys:
+        return []
+    now = time.time()
+    with _KEY_POOL_LOCK:
+        start = _KEY_POOL_CURSOR.get(field, 0) % len(keys)
+        _KEY_POOL_CURSOR[field] = (start + 1) % len(keys)
+        ordered = keys[start:] + keys[:start]
+        available = [key for key in ordered if _KEY_POOL_COOLDOWN.get(f"{field}:{secret_id(key)}", 0) <= now]
+    return available
+
+
+def _cooldown_key(field: str, key: str, seconds: int = 300) -> None:
+    with _KEY_POOL_LOCK:
+        _KEY_POOL_COOLDOWN[f"{field}:{secret_id(key)}"] = time.time() + seconds
+
+
+def _request_with_key_pool(field: str, cfg: Dict[str, Any], fetcher, fallback=None) -> Dict[str, Any]:
+    configured = normalize_secret_values(cfg.get(field))
+    keys = _ordered_pool_keys(field, cfg)
+    if not keys:
+        if configured:
+            raise ProviderKeyUnavailable(f"all configured keys for {field} are cooling down")
+        return fallback() if fallback else {"skipped": "missing_api_key"}
+    for key in keys:
+        try:
+            data = fetcher(key) or {}
+            if not _provider_payload_ok(data):
+                raise ProviderKeyUnavailable("provider rejected the key or quota is unavailable")
+            return data
+        except requests.HTTPError as exc:
+            status = getattr(exc.response, "status_code", None)
+            if status not in {401, 402, 403, 429}:
+                raise
+            _cooldown_key(field, key, 600 if status == 429 else 300)
+        except ProviderKeyUnavailable:
+            _cooldown_key(field, key)
+    raise ProviderKeyUnavailable(f"all configured keys for {field} are unavailable")
 
 
 def load_local_config() -> Dict[str, Any]:
@@ -60,37 +119,50 @@ def _get_json(session: requests.Session, url: str, timeout: int, headers=None, p
 
 def fetch_ipinfo(ip: str, timeout: int = 15, cfg=None) -> Dict[str, Any]:
     cfg = cfg or load_local_config()
-    token = cfg.get("ipinfo_api_key")
     session = _session_with_socks()
-    if token:
-        return _get_json(session, f"https://api.ipinfo.io/lite/{ip}", timeout, params={"token": token})
-    return _get_json(session, f"https://ipinfo.io/widget/demo/{ip}", timeout)
+    return _request_with_key_pool(
+        "ipinfo_api_key",
+        cfg,
+        lambda token: _get_json(session, f"https://api.ipinfo.io/lite/{ip}", timeout, params={"token": token}),
+        fallback=lambda: _get_json(session, f"https://ipinfo.io/widget/demo/{ip}", timeout),
+    )
 
 
 def fetch_ip2location(ip: str, timeout: int = 15, cfg=None) -> Dict[str, Any]:
     cfg = cfg or load_local_config()
-    params = {"ip": ip}
-    if cfg.get("ip2location_api_key"):
-        params["key"] = cfg["ip2location_api_key"]
-    return _get_json(_session_with_socks(), "https://api.ip2location.io/", timeout, params=params)
+    session = _session_with_socks()
+    return _request_with_key_pool(
+        "ip2location_api_key",
+        cfg,
+        lambda key: _get_json(session, "https://api.ip2location.io/", timeout, params={"ip": ip, "key": key}),
+        fallback=lambda: _get_json(session, "https://api.ip2location.io/", timeout, params={"ip": ip}),
+    )
 
 
 def fetch_ipqs(ip: str, timeout: int = 15, cfg=None) -> Dict[str, Any]:
     cfg = cfg or load_local_config()
-    key = cfg.get("ipqs_api_key")
-    if key:
-        url = f"https://www.ipqualityscore.com/api/json/ip/{key}/{ip}"
-        return _get_json(_session_with_socks(), url, timeout, params={"strictness": 1, "allow_public_access_points": "true"})
-    return _get_json(_session_with_socks(), f"https://ipqualityscore.com/api/json/ip/demo/{ip}", timeout)
+    session = _session_with_socks()
+    return _request_with_key_pool(
+        "ipqs_api_key",
+        cfg,
+        lambda key: _get_json(session, f"https://www.ipqualityscore.com/api/json/ip/{key}/{ip}", timeout, params={"strictness": 1, "allow_public_access_points": "true"}),
+        fallback=lambda: _get_json(session, f"https://ipqualityscore.com/api/json/ip/demo/{ip}", timeout),
+    )
 
 
 def fetch_scamalytics(ip: str, timeout: int = 15, cfg=None) -> Dict[str, Any]:
     cfg = cfg or load_local_config()
-    user, key = cfg.get("scamalytics_user"), cfg.get("scamalytics_api_key")
+    user = cfg.get("scamalytics_user")
     headers = {"Accept": "application/json,text/plain,*/*"}
-    if user and key:
-        return _get_json(_session_with_socks(), f"https://api11.scamalytics.com/v3/{user}/", timeout, headers=headers, params={"key": key, "ip": ip})
-    return _get_json(_session_with_socks(), f"https://scamalytics.com/ip/{ip}?output=json", timeout, headers=headers)
+    session = _session_with_socks()
+    if not user:
+        return _get_json(session, f"https://scamalytics.com/ip/{ip}?output=json", timeout, headers=headers)
+    return _request_with_key_pool(
+        "scamalytics_api_key",
+        cfg,
+        lambda key: _get_json(session, f"https://api11.scamalytics.com/v3/{user}/", timeout, headers=headers, params={"key": key, "ip": ip}),
+        fallback=lambda: _get_json(session, f"https://scamalytics.com/ip/{ip}?output=json", timeout, headers=headers),
+    )
 
 
 def fetch_ipapi_is(ip: str, timeout: int = 15, cfg=None) -> Dict[str, Any]:
@@ -99,15 +171,17 @@ def fetch_ipapi_is(ip: str, timeout: int = 15, cfg=None) -> Dict[str, Any]:
 
 def fetch_abuseipdb(ip: str, timeout: int = 15, cfg=None) -> Dict[str, Any]:
     cfg = cfg or load_local_config()
-    key = cfg.get("abuseipdb_api_key")
-    if not key:
-        return {"skipped": "missing_api_key"}
-    data = _get_json(
-        _session_with_socks(),
-        "https://api.abuseipdb.com/api/v2/check",
-        timeout,
-        headers={"Key": key, "Accept": "application/json"},
-        params={"ipAddress": ip, "maxAgeInDays": 90, "verbose": ""},
+    session = _session_with_socks()
+    data = _request_with_key_pool(
+        "abuseipdb_api_key",
+        cfg,
+        lambda key: _get_json(
+            session,
+            "https://api.abuseipdb.com/api/v2/check",
+            timeout,
+            headers={"Key": key, "Accept": "application/json"},
+            params={"ipAddress": ip, "maxAgeInDays": 90, "verbose": ""},
+        ),
     )
     return data.get("data") or data
 
@@ -209,7 +283,9 @@ def enrich_ip_profile(exit_ip: str, timeout: int = 15, sleep_sec: float = 0.0, c
         try:
             out[key] = fn(exit_ip, timeout, cfg) or {}
         except Exception as exc:
-            out["errors"][key] = f"{type(exc).__name__}: {exc}"
+            # Do not include request URLs here: some providers place the API key
+            # in the URL path and requests' exception text would leak it.
+            out["errors"][key] = type(exc).__name__
         if sleep_sec:
             time.sleep(sleep_sec)
     return out

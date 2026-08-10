@@ -52,7 +52,7 @@ def create_app(testing: bool = False) -> Flask:
 
     @app.get("/api/health")
     def health():
-        return jsonify({"ok": True, "version": "2.0.0", "time": time.time()})
+        return jsonify({"ok": True, "version": "2.1.0", "time": time.time()})
 
     @app.get("/api/system")
     def system_info():
@@ -72,7 +72,8 @@ def create_app(testing: bool = False) -> Flask:
         payload = request.get_json(force=True) or {}
         updates = payload.get("updates") or {}
         clear_fields = payload.get("clear_fields") or []
-        save_settings(updates, clear_fields)
+        remove_key_ids = payload.get("remove_key_ids") or {}
+        save_settings(updates, clear_fields, remove_key_ids)
         settings = public_settings()
         manager.reload_history(settings["history_limit"])
         return jsonify(settings)
@@ -162,6 +163,16 @@ def create_app(testing: bool = False) -> Flask:
             return jsonify(manager.cancel_task(task_id))
         except KeyError:
             return jsonify({"error": "Task not found"}), 404
+
+    @app.patch("/api/tasks/<task_id>")
+    def rename_task(task_id):
+        try:
+            payload = request.get_json(force=True) or {}
+            return jsonify(manager.rename_task(task_id, payload.get("name") or ""))
+        except KeyError:
+            return jsonify({"error": "Task not found"}), 404
+        except ValueError as error:
+            return jsonify({"error": str(error)}), 400
 
     @app.get("/api/tasks/<task_id>/export")
     def export_task(task_id):

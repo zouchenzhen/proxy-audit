@@ -4,7 +4,15 @@ Windows 11 下的代理节点批量检测工具。目标是从 v2rayN 备份 / �
 
 ## Web UI（推荐）
 
-双击项目根目录的 `start-web.cmd`，或者在 PowerShell 中运行：
+克隆后双击项目根目录的 `start-web.cmd` 即可。首次启动会自动创建 `.venv`、安装 Python 依赖，并在缺少检测内核时从 sing-box 官方发行页下载经过 SHA256 校验的固定版本：
+
+```powershell
+git clone https://github.com/zouchenzhen/proxy-audit.git
+cd proxy-audit
+.\start-web.cmd
+```
+
+也可以在 PowerShell 中运行：
 
 ```powershell
 cd E:/Openclaw_Workspace/proxy_audit
@@ -19,11 +27,14 @@ Web UI 现已支持：
 - 自动解析 VLESS、VMess、Trojan、Shadowsocks、Hysteria2、TUIC、AnyTLS
 - 在 sing-box 与 Xray 两个检测内核之间选择，并显示本机可用状态
 - 控制并发数、超时、节点上限以及运行前关键字筛选
+- 在脱敏节点列表中搜索、按协议筛选、逐项勾选、选择当前筛选结果后只检测选中节点
 - 自选 IP-API、ipapi.is、IPinfo、IP2Location、IPQS、Scamalytics、AbuseIPDB
+- 每个收费/限额情报源可保存最多 50 个 Key；后台轮询使用，鉴权失败或额度受限时自动切换
 - 后台任务进度、取消、事件流、结果搜索和多维筛选
 - 解析完成即显示脱敏节点预览，不必先运行检测
 - 普通刷新自动恢复当前导入、运行中任务与最近结果
 - 从本机脱敏 raw 记录恢复最近任务，默认 10 条，可在设置中调整 1–100 条
+- 历史任务可重命名；切换历史任务时，顶部节点数、协议、成功率和状态均来自该任务自身
 - 深色、浅色、跟随系统三种主题和三档界面字号；浏览器会记住选择
 - 安全导出 CSV、JSON、Markdown；导出结果不会包含 UUID、密码或订阅地址
 - 可选延迟/抖动采样，以及默认关闭的 ChatGPT、Claude、GitHub、YouTube 端点探测
@@ -33,7 +44,8 @@ Web UI 现已支持：
 ### Key 与节点凭据安全
 
 - 在 Web 设置中保存的 Key 会写入 `config.secure.json`；Windows 下使用当前用户 DPAPI 加密。
-- API 不会把已保存的 Key 回传给浏览器，只显示“已配置”状态。
+- API 不会把已保存的完整 Key 回传给浏览器；设置中的小眼睛最多显示短前缀用于辨认。
+- 多 Key 输入每行一个，自动去重；可逐枚移除，也可清空某个服务商的整个 Key 池。
 - 每个节点的临时内核配置会在检测后删除。
 - Web 新任务保存的 raw/CSV/Markdown 都会剔除 UUID、密码、订阅 URL 和日志尾部。
 - 最近任务恢复只读取上述脱敏 raw 文件；调整显示数不会删除旧报告。
@@ -154,7 +166,7 @@ cd E:/Openclaw_Workspace/proxy_audit
 
 ### Web 加密设置（推荐）
 
-设置面板会生成 `config.secure.json`。Windows 下内容由 DPAPI 加密，只能由当前 Windows 用户解密。
+设置面板会生成 `config.secure.json`。Windows 下内容由 DPAPI 加密，只能由当前 Windows 用户解密。以下字段既兼容旧版单个字符串，也支持字符串数组；推荐数组形式：
 
 ### `config.local.json`（旧版兼容）
 
@@ -162,12 +174,12 @@ cd E:/Openclaw_Workspace/proxy_audit
 
 ```json
 {
-  "ip2location_api_key": "...",
-  "ipinfo_api_key": "...",
-  "ipqs_api_key": "...",
+  "ip2location_api_key": ["key-1", "key-2"],
+  "ipinfo_api_key": ["key-1", "key-2"],
+  "ipqs_api_key": ["key-1", "key-2"],
   "scamalytics_user": "...",
-  "scamalytics_api_key": "...",
-  "abuseipdb_api_key": "..."
+  "scamalytics_api_key": ["key-1", "key-2"],
+  "abuseipdb_api_key": ["key-1", "key-2"]
 }
 ```
 

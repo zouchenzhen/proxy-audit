@@ -18,10 +18,12 @@ from lib_v2rayn import filter_nodes
 
 
 WEB_RUN_PATTERN = re.compile(r"^run_(\d{8}_\d{6}_[0-9a-f]{6})\.json$")
+MAX_PUBLIC_IMPORT_NODES = 10000
 
 
 def safe_node(node: Dict[str, Any]) -> Dict[str, Any]:
     return {
+        "node_id": node.get("_selection_id"),
         "remark": node.get("remark"),
         "protocol": node.get("protocol"),
         "server": node.get("server"),
@@ -59,6 +61,8 @@ class TaskManager:
 
     def add_import(self, nodes: List[Dict[str, Any]], source_label: str) -> Dict[str, Any]:
         import_id = uuid.uuid4().hex[:12]
+        for index, node in enumerate(nodes):
+            node["_selection_id"] = f"n{index + 1:05d}"
         record = {
             "id": import_id,
             "source_label": source_label,
@@ -81,7 +85,7 @@ class TaskManager:
             "protocols": protocol_counts(nodes),
         }
         if include_preview:
-            output["preview"] = [safe_node(node) for node in nodes[:500]]
+            output["preview"] = [safe_node(node) for node in nodes[:MAX_PUBLIC_IMPORT_NODES]]
             output["preview_count"] = len(output["preview"])
             output["preview_truncated"] = len(nodes) > len(output["preview"])
         return output
@@ -106,12 +110,16 @@ class TaskManager:
             raise ValueError("Imported node set not found; please import nodes again")
         kernel = str(spec.get("kernel") or "sing-box")
         protocols = [str(x).lower() for x in spec.get("protocols") or []]
-        selected = filter_nodes(
-            imported["nodes"],
-            filter_substring=str(spec.get("search") or ""),
-            protocols=protocols,
-            limit=int(spec.get("limit") or 0) or None,
-        )
+        requested_ids = {str(value) for value in (spec.get("node_ids") or []) if value}
+        if requested_ids:
+            selected = [node for node in imported["nodes"] if node.get("_selection_id") in requested_ids]
+        else:
+            selected = filter_nodes(
+                imported["nodes"],
+                filter_substring=str(spec.get("search") or ""),
+                protocols=protocols,
+                limit=int(spec.get("limit") or 0) or None,
+            )
         if not selected:
             raise ValueError("No nodes match the current filters")
         task_id = time.strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
@@ -119,6 +127,7 @@ class TaskManager:
         services = [s for s in (spec.get("service_targets") or []) if s in SERVICE_TARGETS]
         task = {
             "id": task_id,
+            "name": str(spec.get("name") or "").strip(),
             "status": "queued",
             "source_label": imported["source_label"],
             "kernel": kernel,
@@ -132,6 +141,7 @@ class TaskManager:
             "skipped": 0,
             "cancelled": 0,
             "progress": 0.0,
+            "protocols": protocol_counts(selected),
             "settings": {
                 "timeout": max(4, min(int(spec.get("timeout") or 15), 90)),
                 "concurrency": max(1, min(int(spec.get("concurrency") or 2), 8)),
@@ -236,8 +246,10 @@ class TaskManager:
             safe_results.append(safe_item)
         payload = {
             "run_id": run_id,
+            "name": task.get("name") or "",
             "source_label": task["source_label"],
             "kernel": task["kernel"],
+            "protocols": task.get("protocols") or {},
             "settings": task["settings"],
             "status": task["status"],
             "created_at": task["created_at"],
@@ -266,7 +278,7 @@ class TaskManager:
 
     def public_task(self, task: Dict[str, Any], include_rows: bool = True) -> Dict[str, Any]:
         fields = (
-            "id", "status", "source_label", "kernel", "created_at", "started_at", "finished_at",
+            "id", "name", "status", "source_label", "kernel", "protocols", "created_at", "started_at", "finished_at",
             "total", "completed", "success", "failed", "skipped", "cancelled", "progress", "settings", "events", "paths",
         )
         output = {field: task.get(field) for field in fields}
@@ -283,6 +295,26 @@ class TaskManager:
         with self._lock:
             tasks = sorted(self.tasks.values(), key=lambda item: item.get("created_at") or 0, reverse=True)
             return [self.public_task(task, include_rows=False) for task in tasks[:self.history_limit]]
+
+    def rename_task(self, task_id: str, name: str) -> Dict[str, Any]:
+        clean = re.sub(r"[\x00-\x1f\x7f]", "", str(name or "")).strip()
+        if not clean:
+            raise ValueError("Task name cannot be empty")
+        if len(clean) > 80:
+            raise ValueError("Task name must be 80 characters or fewer")
+        with self._lock:
+            task = self.tasks.get(task_id)
+            if not task:
+                raise KeyError(task_id)
+            task["name"] = clean
+            raw_path = Path((task.get("paths") or {}).get("raw") or RESULT_RAW / f"run_{task_id}.json")
+            if raw_path.exists():
+                payload = json.loads(raw_path.read_text(encoding="utf-8"))
+                payload["name"] = clean
+                temp = raw_path.with_suffix(".tmp")
+                temp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+                temp.replace(raw_path)
+            return self.public_task(task)
 
     def reload_history(self, history_limit: int) -> None:
         self.history_limit = max(1, min(int(history_limit or 10), 100))
@@ -306,6 +338,7 @@ class TaskManager:
                 finished_at = payload.get("finished_at") or path.stat().st_mtime
                 task = {
                     "id": run_id,
+                    "name": payload.get("name") or "",
                     "status": payload.get("status") or "completed",
                     "source_label": payload.get("source_label") or "restored run",
                     "kernel": payload.get("kernel") or "unknown",
@@ -319,6 +352,9 @@ class TaskManager:
                     "skipped": skipped,
                     "cancelled": cancelled,
                     "progress": 100.0,
+                    "protocols": payload.get("protocols") or protocol_counts([
+                        item.get("node") or {} for item in results
+                    ]),
                     "settings": payload.get("settings") or {},
                     "events": payload.get("events") or [{
                         "time": finished_at,

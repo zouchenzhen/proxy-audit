@@ -11,6 +11,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 import lib_secrets
 import lib_tasks
+import lib_ipintel
 from lib_report import build_summary_rows
 from lib_tasks import TaskManager
 
@@ -25,12 +26,41 @@ class SecureSettingsTests(unittest.TestCase):
             with patch.object(lib_secrets, "SECURE_CONFIG", secure), patch.object(lib_secrets, "LEGACY_CONFIG", legacy):
                 lib_secrets.save_settings({"ipinfo_api_key": "new-secret"})
                 loaded = lib_secrets.load_settings()
-                self.assertEqual(loaded["ipinfo_api_key"], "new-secret")
-                self.assertEqual(loaded["ipqs_api_key"], "legacy-secret")
+                self.assertEqual(loaded["ipinfo_api_key"], ["new-secret"])
+                self.assertEqual(loaded["ipqs_api_key"], ["legacy-secret"])
                 lib_secrets.save_settings({}, clear_fields=["ipqs_api_key"])
-                self.assertEqual(lib_secrets.load_settings().get("ipqs_api_key"), "")
+                self.assertEqual(lib_secrets.load_settings().get("ipqs_api_key"), [])
                 wrapper = secure.read_text(encoding="utf-8")
                 self.assertNotIn("new-secret", wrapper)
+
+    def test_multiple_keys_have_safe_previews_and_individual_removal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            secure = Path(directory) / "config.secure.json"
+            legacy = Path(directory) / "config.local.json"
+            with patch.object(lib_secrets, "SECURE_CONFIG", secure), patch.object(lib_secrets, "LEGACY_CONFIG", legacy):
+                lib_secrets.save_settings({"ipinfo_api_key": ["alpha-secret-111", "beta-secret-222", "alpha-secret-111"]})
+                public = lib_secrets.public_settings()
+                self.assertEqual(public["key_counts"]["ipinfo_api_key"], 2)
+                self.assertNotIn("alpha-secret-111", json.dumps(public))
+                first_id = public["key_previews"]["ipinfo_api_key"][0]["id"]
+                lib_secrets.save_settings({}, remove_key_ids={"ipinfo_api_key": [first_id]})
+                self.assertEqual(lib_secrets.load_settings()["ipinfo_api_key"], ["beta-secret-222"])
+
+    def test_key_pool_rotates_after_rejected_key(self):
+        attempts = []
+        with lib_ipintel._KEY_POOL_LOCK:
+            lib_ipintel._KEY_POOL_CURSOR.clear()
+            lib_ipintel._KEY_POOL_COOLDOWN.clear()
+
+        def fetcher(key):
+            attempts.append(key)
+            if key == "bad-key":
+                raise lib_ipintel.ProviderKeyUnavailable("quota")
+            return {"ok": True}
+
+        result = lib_ipintel._request_with_key_pool("ipinfo_api_key", {"ipinfo_api_key": ["bad-key", "good-key"]}, fetcher)
+        self.assertTrue(result["ok"])
+        self.assertEqual(attempts, ["bad-key", "good-key"])
 
     def test_history_limit_is_bounded_and_public(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -113,9 +143,24 @@ class ResultRedactionTests(unittest.TestCase):
             with patch.object(lib_tasks, "RESULT_RAW", raw), patch.object(lib_tasks, "RESULT_CSV", csv_dir), patch.object(lib_tasks, "RESULT_REPORT", reports):
                 manager = TaskManager(history_limit=10)
                 restored = manager.get_task("20260808_120000_abcdef")
+                renamed = manager.rename_task("20260808_120000_abcdef", "晚间复测")
             self.assertIsNotNone(restored)
             self.assertEqual(restored["success"], 1)
             self.assertEqual(restored["rows"][0]["remark"], "safe")
+            self.assertEqual(renamed["name"], "晚间复测")
+            self.assertEqual(json.loads((raw / "run_20260808_120000_abcdef.json").read_text(encoding="utf-8"))["name"], "晚间复测")
+
+    def test_explicit_node_selection_only_starts_selected_nodes(self):
+        manager = TaskManager(history_limit=1)
+        imported = manager.add_import([
+            {"remark": "one", "protocol": "vless", "server": "one.invalid", "server_port": 443},
+            {"remark": "two", "protocol": "trojan", "server": "two.invalid", "server_port": 443},
+        ], "selection test")
+        selected_id = imported["preview"][1]["node_id"]
+        with patch.object(lib_tasks.threading.Thread, "start", return_value=None):
+            task = manager.start_task({"import_id": imported["id"], "node_ids": [selected_id], "providers": ["ip_api"]})
+        self.assertEqual(task["total"], 1)
+        self.assertEqual(task["protocols"], {"trojan": 1})
 
     def test_history_limit_only_controls_index_and_does_not_delete_files(self):
         with tempfile.TemporaryDirectory() as directory:

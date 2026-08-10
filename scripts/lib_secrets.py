@@ -1,10 +1,11 @@
 import base64
 import ctypes
+import hashlib
 import json
 import os
 from ctypes import wintypes
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Iterable, List
 
 from lib_paths import ROOT
 
@@ -26,6 +27,7 @@ ALLOWED_FIELDS = SECRET_FIELDS | {
     "default_concurrency",
     "history_limit",
 }
+MAX_KEYS_PER_PROVIDER = 50
 
 
 class DATA_BLOB(ctypes.Structure):
@@ -89,6 +91,39 @@ def _read_secure() -> Dict[str, Any]:
     return json.loads(payload.decode("utf-8"))
 
 
+def normalize_secret_values(value: Any) -> List[str]:
+    if isinstance(value, str):
+        values: Iterable[Any] = value.replace("\r", "\n").replace(",", "\n").replace(";", "\n").split("\n")
+    elif isinstance(value, (list, tuple, set)):
+        values = value
+    else:
+        values = []
+    output: List[str] = []
+    seen = set()
+    for item in values:
+        key = str(item or "").strip()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        output.append(key)
+        if len(output) >= MAX_KEYS_PER_PROVIDER:
+            break
+    return output
+
+
+def secret_id(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+
+
+def secret_preview(value: str) -> Dict[str, str]:
+    visible = min(6, len(value) - 4) if len(value) > 4 else 0
+    return {
+        "id": secret_id(value),
+        "masked": "••••••••",
+        "prefix": f"{value[:visible]}…" if visible else "••…",
+    }
+
+
 def load_settings(include_legacy: bool = True) -> Dict[str, Any]:
     settings: Dict[str, Any] = {}
     if include_legacy and LEGACY_CONFIG.exists():
@@ -100,18 +135,30 @@ def load_settings(include_legacy: bool = True) -> Dict[str, Any]:
         settings.update(_read_secure())
     except (OSError, ValueError, RuntimeError):
         pass
-    return {key: value for key, value in settings.items() if key in ALLOWED_FIELDS}
+    output = {key: value for key, value in settings.items() if key in ALLOWED_FIELDS}
+    for field in SECRET_FIELDS:
+        if field in output:
+            output[field] = normalize_secret_values(output[field])
+    return output
 
 
-def save_settings(updates: Dict[str, Any], clear_fields=None) -> Dict[str, Any]:
+def save_settings(updates: Dict[str, Any], clear_fields=None, remove_key_ids=None) -> Dict[str, Any]:
     current = load_settings()
     for key in clear_fields or []:
         if key in ALLOWED_FIELDS:
             # Keep an explicit empty tombstone so a cleared value does not
             # reappear from the legacy plaintext config during migration.
-            current[key] = ""
+            current[key] = [] if key in SECRET_FIELDS else ""
+    for field, identifiers in (remove_key_ids or {}).items():
+        if field not in SECRET_FIELDS:
+            continue
+        remove = {str(identifier) for identifier in identifiers or []}
+        current[field] = [key for key in normalize_secret_values(current.get(field)) if secret_id(key) not in remove]
     for key, value in updates.items():
         if key not in ALLOWED_FIELDS or value is None or value == "":
+            continue
+        if key in SECRET_FIELDS:
+            current[key] = normalize_secret_values(normalize_secret_values(current.get(key)) + normalize_secret_values(value))
             continue
         if key in {"default_timeout", "default_concurrency", "history_limit"}:
             value = int(value)
@@ -133,8 +180,14 @@ def save_settings(updates: Dict[str, Any], clear_fields=None) -> Dict[str, Any]:
 
 def public_settings() -> Dict[str, Any]:
     settings = load_settings()
+    key_previews = {
+        field: [secret_preview(value) for value in normalize_secret_values(settings.get(field))]
+        for field in sorted(SECRET_FIELDS)
+    }
     return {
-        "configured": {field: bool(settings.get(field)) for field in sorted(SECRET_FIELDS)},
+        "configured": {field: bool(key_previews[field]) for field in sorted(SECRET_FIELDS)},
+        "key_counts": {field: len(key_previews[field]) for field in sorted(SECRET_FIELDS)},
+        "key_previews": key_previews,
         "scamalytics_user_configured": bool(settings.get("scamalytics_user")),
         "singbox_path": settings.get("singbox_path") or "",
         "xray_path": settings.get("xray_path") or "",

@@ -207,31 +207,41 @@ def main():
                 return rect.left < box.left || rect.right > box.right;
               }).length,
               clearControls: document.querySelectorAll('.clear-option').length,
+              keyPoolInputs: document.querySelectorAll('.secret-entry').length,
+              keyEyes: document.querySelectorAll('[data-key-eye]').length,
             };
           })()
         """)
         assert modal["bodyLocked"], modal
         assert modal["viewportFit"], modal
         assert modal["fieldOverflow"] == 0, modal
+        assert modal["keyPoolInputs"] == 5, modal
+        assert modal["keyEyes"] == 5, modal
         cdp.screenshot(Path(args.screenshot))
         cdp.evaluate("document.querySelector('[data-close=" + json.dumps("settingsModal") + "]').click()")
         wait_for(lambda: cdp.evaluate("document.querySelector('#settingsModal').classList.contains('hidden')"), message="settings close")
 
         cdp.evaluate("""
-          document.querySelector('#nodeText').value = 'socks://browser-acceptance.invalid:1080#Browser-Acceptance';
+          document.querySelector('#nodeText').value = `socks://browser-acceptance-a.invalid:1080#Browser-Acceptance-A
+socks://browser-acceptance-b.invalid:1080#Browser-Acceptance-B`;
           document.querySelector('#importButton').click();
         """)
         wait_for(lambda: cdp.evaluate("!document.querySelector('#importSummary').classList.contains('hidden')"), message="UI node import")
-        assert cdp.evaluate("document.querySelector('#metricImported').textContent") == "1"
+        assert cdp.evaluate("document.querySelector('#metricImported').textContent") == "2"
         assert cdp.evaluate("document.querySelector('#startButton').disabled") is False
-        assert cdp.evaluate("document.querySelectorAll('#resultBody tr').length") == 1
+        assert cdp.evaluate("document.querySelectorAll('#resultBody tr').length") == 2
         assert cdp.evaluate("document.querySelector('#resultBody .status-pending').textContent") == "待检测"
-        assert "Browser-Acceptance" in cdp.evaluate("document.querySelector('#resultBody').textContent")
+        assert "Browser-Acceptance-A" in cdp.evaluate("document.querySelector('#resultBody').textContent")
+        cdp.evaluate("document.querySelector('[data-node-select]').click()")
+        assert "已选择 1 个节点" in cdp.evaluate("document.querySelector('#selectionCount').textContent")
+        assert "仅检测已选 1 个节点" in cdp.evaluate("document.querySelector('#startHint').textContent")
 
         cdp.call("Page.reload", {"ignoreCache": True})
         wait_for(lambda: cdp.evaluate("document.readyState === 'complete'"), message="preview page reload")
-        wait_for(lambda: cdp.evaluate("document.querySelectorAll('#resultBody tr').length === 1"), message="import preview restore")
+        wait_for(lambda: cdp.evaluate("document.querySelectorAll('#resultBody tr').length === 2"), message="import preview restore")
         assert cdp.evaluate("document.querySelector('#resultBody .status-pending').textContent") == "待检测"
+        cdp.evaluate("document.querySelector('[data-node-select]').click()")
+        assert "已选择 1 个节点" in cdp.evaluate("document.querySelector('#selectionCount').textContent")
         preview_screenshot = Path(args.screenshot).with_name(Path(args.screenshot).stem + "-preview" + Path(args.screenshot).suffix)
         cdp.screenshot(preview_screenshot)
 
@@ -260,13 +270,20 @@ def main():
             message="UI task completion",
         )
         assert cdp.evaluate("document.querySelectorAll('#resultBody tr').length") == 1
+        assert cdp.evaluate("document.querySelector('#metricImported').textContent") == "1"
         assert cdp.evaluate("document.querySelector('#exportJson').disabled") is False
         cdp.call("Page.reload", {"ignoreCache": True})
         wait_for(lambda: cdp.evaluate("document.readyState === 'complete'"), message="result page reload")
         wait_for(lambda: cdp.evaluate("document.querySelector('#taskTitle').textContent.includes('检测完成')"), message="task result restore")
         assert cdp.evaluate("document.querySelectorAll('#resultBody tr').length") == 1
+        assert cdp.evaluate("document.querySelector('#metricImported').textContent") == "1"
         assert cdp.evaluate("document.documentElement.dataset.theme") == "light"
         assert cdp.evaluate("document.documentElement.dataset.fontSize") == "xlarge"
+        cdp.evaluate("document.querySelector(`[data-rename-task='${sessionStorage.getItem('proxyScope.currentTask')}']`).click()")
+        wait_for(lambda: cdp.evaluate("!document.querySelector('#renameModal').classList.contains('hidden')"), message="rename modal")
+        cdp.evaluate("document.querySelector('#renameTaskInput').value = 'Browser renamed history'; document.querySelector('#saveTaskName').click()")
+        wait_for(lambda: cdp.evaluate("document.querySelector('#historyList').textContent.includes('Browser renamed history')"), message="renamed history")
+        assert "Browser renamed history" in cdp.evaluate("document.querySelector('#taskTitle').textContent")
         cdp.evaluate("""
           const status = document.querySelector('#statusFilter');
           status.value = 'skipped'; status.dispatchEvent(new Event('input', {bubbles:true}));
@@ -289,6 +306,9 @@ def main():
             "importPreviewRestore": "passed",
             "uiTask": "passed",
             "taskResultRestore": "passed",
+            "partialSelection": "passed",
+            "historicalMetricContext": "passed",
+            "historyRename": "passed",
             "themeAndFontPersistence": "passed",
             "resultFiltering": "passed",
             "javascriptExceptions": 0,

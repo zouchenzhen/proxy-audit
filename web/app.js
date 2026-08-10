@@ -8,6 +8,11 @@ const state = {
   tasks: [],
   activeImportTab: "paste",
   pollTimer: null,
+  selectedNodeIds: new Set(),
+  page: 1,
+  pageSize: 100,
+  pendingKeyRemovals: {},
+  renameTaskId: null,
 };
 
 const UI_THEME_KEY = "proxyScope.theme";
@@ -148,28 +153,59 @@ function renderServices() {
 function renderSettings() {
   const settings = state.system?.settings || {};
   const configured = settings.configured || {};
+  const previews = settings.key_previews || {};
   const fields = ["ipinfo_api_key", "ip2location_api_key", "ipqs_api_key", "scamalytics_user", "scamalytics_api_key", "abuseipdb_api_key"];
+  state.pendingKeyRemovals = {};
   $("#keySettings").innerHTML = fields.map(field => {
     const isSecret = field !== "scamalytics_user";
     const isConfigured = field === "scamalytics_user" ? settings.scamalytics_user_configured : configured[field];
+    const saved = isSecret ? (previews[field] || []) : [];
+    const savedKeys = saved.length ? `<div class="saved-key-list" data-key-list="${field}">${saved.map((item, index) => `
+      <span class="saved-key" data-key-id="${escapeHtml(item.id)}">
+        <code data-masked="${escapeHtml(item.masked)}" data-prefix="${escapeHtml(item.prefix)}">Key ${index + 1} · ${escapeHtml(item.masked)}</code>
+        <button type="button" class="key-remove" data-remove-key="${escapeHtml(field)}" data-remove-id="${escapeHtml(item.id)}" title="保存后移除此 Key">×</button>
+      </span>`).join("")}</div>` : "";
     return `<div class="key-field">
-      <label><span>${escapeHtml(keyLabels[field])}</span>${isConfigured ? "<b>已配置</b>" : ""}</label>
+      <label><span>${escapeHtml(keyLabels[field])}</span>${isConfigured ? `<b>${isSecret ? `${saved.length} 个 Key` : "已配置"}</b>` : ""}</label>
+      ${savedKeys}
       <div class="key-input-row">
-        <input type="${isSecret ? "password" : "text"}" data-setting="${field}" autocomplete="off" placeholder="${isConfigured ? "留空保留现有值" : "未配置"}">
-        ${isConfigured ? `<label class="clear-option" title="勾选后保存将清除此项"><input type="checkbox" data-clear="${field}"><span>清除</span></label>` : ""}
+        ${isSecret
+          ? `<textarea class="secret-entry" data-setting="${field}" autocomplete="off" spellcheck="false" placeholder="${isConfigured ? "每行添加一个新 Key；留空保留" : "每行填写一个 Key"}"></textarea><button type="button" class="key-eye" data-key-eye="${field}" title="仅显示已保存 Key 的短前缀" aria-label="显示 Key 短前缀">◉</button>`
+          : `<input type="text" data-setting="${field}" autocomplete="off" placeholder="${isConfigured ? "留空保留现有值" : "未配置"}">`}
+        ${isConfigured ? `<label class="clear-option" title="勾选后保存将清除此项"><input type="checkbox" data-clear="${field}"><span>清空</span></label>` : ""}
       </div>
     </div>`;
   }).join("");
+  $$('[data-key-eye]').forEach(button => button.addEventListener("click", () => {
+    const field = button.dataset.keyEye;
+    const visible = button.classList.toggle("visible");
+    $$(`[data-key-list="${field}"] code`).forEach(code => {
+      code.textContent = visible ? code.dataset.prefix : code.dataset.masked;
+    });
+    button.textContent = visible ? "◉" : "◎";
+    button.title = visible ? "隐藏 Key 短前缀" : "仅显示已保存 Key 的短前缀";
+  }));
+  $$('[data-remove-key]').forEach(button => button.addEventListener("click", () => {
+    const field = button.dataset.removeKey;
+    state.pendingKeyRemovals[field] ||= new Set();
+    state.pendingKeyRemovals[field].add(button.dataset.removeId);
+    button.closest(".saved-key").classList.add("pending-remove");
+  }));
   $("#settingSingbox").value = settings.singbox_path || "";
   $("#settingXray").value = settings.xray_path || "";
   $("#settingHistoryLimit").value = settings.history_limit || 10;
   applyPreferences(localStorage.getItem(UI_THEME_KEY) || "dark", localStorage.getItem(UI_FONT_KEY) || "large");
-  $("#vaultNote").textContent = `存储方式：${settings.storage}。${settings.legacy_config_detected ? "检测到旧版 config.local.json；新保存值会优先使用加密配置。" : "页面不会回传或显示已保存的 Key。"}`;
+  $("#vaultNote").textContent = `存储方式：${settings.storage}。服务端绝不回传完整 Key；小眼睛只显示用于辨认的短前缀。${settings.legacy_config_detected ? "检测到旧版 config.local.json；新保存值会优先使用加密配置。" : ""}`;
 }
 
 async function saveSettings() {
   const updates = {};
-  $$('[data-setting]').forEach(input => { if (input.value.trim()) updates[input.dataset.setting] = input.value.trim(); });
+  $$('[data-setting]').forEach(input => {
+    if (!input.value.trim()) return;
+    updates[input.dataset.setting] = input.classList.contains("secret-entry")
+      ? input.value.split(/[\r\n,;]+/).map(value => value.trim()).filter(Boolean)
+      : input.value.trim();
+  });
   if ($("#settingSingbox").value.trim()) updates.singbox_path = $("#settingSingbox").value.trim();
   if ($("#settingXray").value.trim()) updates.xray_path = $("#settingXray").value.trim();
   updates.default_timeout = Number($("#timeout").value || 15);
@@ -177,8 +213,9 @@ async function saveSettings() {
   updates.history_limit = Math.max(1, Math.min(Number($("#settingHistoryLimit").value || 10), 100));
   applyPreferences($("#themeSelect").value, $("#fontSizeSelect").value);
   const clear_fields = $$('[data-clear]:checked').map(input => input.dataset.clear);
+  const remove_key_ids = Object.fromEntries(Object.entries(state.pendingKeyRemovals).map(([field, values]) => [field, [...values]]));
   try {
-    const settings = await api("/api/settings", { method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify({updates, clear_fields}) });
+    const settings = await api("/api/settings", { method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify({updates, clear_fields, remove_key_ids}) });
     state.system.settings = settings;
     closeModal("settingsModal");
     await loadSystem();
@@ -203,6 +240,8 @@ async function importNodes() {
   try {
     state.imported = await api("/api/import", { method: "POST", body: form });
     state.currentTask = null;
+    state.selectedNodeIds.clear();
+    state.page = 1;
     sessionStorage.setItem(SESSION_IMPORT_KEY, state.imported.id);
     sessionStorage.removeItem(SESSION_TASK_KEY);
     ["resultSearch","statusFilter","riskFilter","typeFilter"].forEach(id => $("#" + id).value = "");
@@ -219,13 +258,14 @@ function previewRows() {
 function renderImport() {
   if (!state.imported) return;
   const chips = Object.entries(state.imported.protocols || {}).map(([key,value]) => `<span class="mini-chip">${escapeHtml(key)} · ${value}</span>`).join("");
-  const note = state.imported.preview_truncated ? `显示前 ${state.imported.preview_count} 条` : "节点列表已在右侧显示";
+  const note = state.imported.preview_truncated ? `显示前 ${state.imported.preview_count} 条` : "节点列表已在右侧显示，可筛选并勾选部分节点";
   $("#importSummary").innerHTML = `<strong>已识别 ${state.imported.total} 个唯一节点</strong><small>${escapeHtml(state.imported.source_label)}</small><div class="mini-chips">${chips}</div><div class="preview-note">${escapeHtml(note)} · 凭据已隐藏</div>`;
   $("#importSummary").classList.remove("hidden");
   $("#metricImported").textContent = state.imported.total;
+  $("#metricImportedLabel").textContent = "已导入";
   $("#metricProtocols").textContent = Object.keys(state.imported.protocols || {}).join(" / ");
   $("#startButton").disabled = false;
-  $("#startHint").textContent = `${state.imported.total} 个节点待检测`;
+  updateSelectionSummary();
   populateProtocolFilter(Object.keys(state.imported.protocols || {}));
   if (!state.currentTask) {
     $("#metricSuccess").textContent = "—";
@@ -245,6 +285,13 @@ function renderImport() {
 
 function selectedValues(selector) { return $$(selector).filter(input => input.checked).map(input => input.value); }
 
+function updateSelectionSummary(filteredCount = null) {
+  const count = state.selectedNodeIds.size;
+  if ($("#selectionCount")) $("#selectionCount").textContent = count ? `已选择 ${count} 个节点` : "尚未手动选择（默认检测全部）";
+  if ($("#selectionFiltered")) $("#selectionFiltered").textContent = filteredCount == null ? "" : `当前筛选 ${filteredCount} 个`;
+  if ($("#startHint") && state.imported) $("#startHint").textContent = count ? `仅检测已选 ${count} 个节点` : `${state.imported.total} 个节点待检测`;
+}
+
 async function startTask() {
   if (!state.imported) return toast("请先导入节点", "error");
   const kernel = $('input[name=kernel]:checked')?.value;
@@ -259,6 +306,7 @@ async function startTask() {
     quality_samples: $("#qualityProbe").checked ? 2 : 0,
     search: $("#preFilter").value.trim(),
     limit: Number($("#nodeLimit").value || 0),
+    node_ids: [...state.selectedNodeIds],
   };
   if (!payload.providers.length) return toast("请至少选择一个 IP 情报源", "error");
   try {
@@ -297,7 +345,8 @@ function renderTask() {
   if (!task) return;
   const active = ["queued","running","cancelling"].includes(task.status);
   $("#taskOrb").className = `status-orb ${active ? "running" : task.status === "completed" ? "completed" : "failed"}`;
-  $("#taskTitle").textContent = `${task.kernel} · ${task.status === "completed" ? "检测完成" : task.status === "cancelled" ? "任务已取消" : "正在批量检测"}`;
+  const taskName = task.name || task.kernel;
+  $("#taskTitle").textContent = `${taskName} · ${task.status === "completed" ? "检测完成" : task.status === "cancelled" ? "任务已取消" : "正在批量检测"}`;
   $("#taskSubtitle").textContent = `${task.completed}/${task.total} · 成功 ${task.success} · 失败 ${task.failed} · 跳过 ${task.skipped} · ${formatDuration(task.started_at, task.finished_at)}`;
   $("#progressBar").style.width = `${task.progress || 0}%`;
   $("#progressText").textContent = `${Math.round(task.progress || 0)}%`;
@@ -306,6 +355,10 @@ function renderTask() {
   $("#metricSuccess").textContent = task.success;
   $("#metricSuccessRate").textContent = task.total ? `${Math.round(task.success / task.total * 100)}% 成功率` : "—";
   const rows = task.rows || [];
+  $("#metricImportedLabel").textContent = "本任务节点";
+  $("#metricImported").textContent = task.total;
+  $("#metricProtocols").textContent = Object.keys(task.protocols || {}).join(" / ") || "历史检测节点";
+  populateProtocolFilter(Object.keys(task.protocols || {}));
   $("#metricLowRisk").textContent = rows.filter(row => row.success && row.risk_level_final === "low").length;
   $("#metricCivilian").textContent = rows.filter(row => row.success && ["residential_or_business","mobile"].includes(row.ip_type_final)).length;
   renderEvents(task.events || []);
@@ -330,17 +383,29 @@ function filteredRows() {
 }
 
 function renderRows() {
-  const rows = filteredRows();
-  $("#visibleCount").textContent = `${rows.length} 条`;
-  $("#emptyState").classList.toggle("hidden", rows.length > 0);
-  $("#emptyTitle").textContent = state.imported ? "没有符合筛选条件的节点" : "等待导入节点";
-  $("#emptyCopy").textContent = state.imported ? "请清除搜索词或筛选条件后重试。" : "解析后会立即显示脱敏节点列表；节点凭据不会出现在页面中。";
+  const allRows = filteredRows();
+  const pageCount = Math.max(1, Math.ceil(allRows.length / state.pageSize));
+  state.page = Math.min(Math.max(1, state.page), pageCount);
+  const start = (state.page - 1) * state.pageSize;
+  const rows = allRows.slice(start, start + state.pageSize);
+  $("#visibleCount").textContent = allRows.length ? `${start + 1}–${start + rows.length} / ${allRows.length} 条` : "0 条";
+  $("#emptyState").classList.toggle("hidden", allRows.length > 0);
+  $("#emptyTitle").textContent = state.imported || state.currentTask ? "没有符合筛选条件的节点" : "等待导入节点";
+  $("#emptyCopy").textContent = state.imported || state.currentTask ? "请清除搜索词或筛选条件后重试。" : "解析后会立即显示脱敏节点列表；节点凭据不会出现在页面中。";
+  const selecting = !state.currentTask && !!state.imported;
+  $("#selectionBar").classList.toggle("hidden", !selecting);
+  $("#pagePrev").disabled = state.page <= 1;
+  $("#pageNext").disabled = state.page >= pageCount;
+  $("#pageInfo").textContent = `${state.page} / ${pageCount}`;
+  updateSelectionSummary(allRows.length);
+  $("#selectColumn").classList.toggle("hidden", !selecting);
   $("#resultBody").innerHTML = rows.map((row, index) => {
     const status = rowStatus(row);
     const statusText = status === "pending" ? "待检测" : status === "success" ? "成功" : status === "skipped" ? "跳过" : "失败";
     const latency = row.latency_median_ms;
     const latencyClass = latency == null ? "" : latency < 250 ? "latency-good" : latency < 600 ? "latency-mid" : "latency-bad";
     return `<tr>
+      <td class="select-cell ${selecting ? "" : "hidden"}">${selecting ? `<input type="checkbox" data-node-select="${escapeHtml(row.node_id)}" ${state.selectedNodeIds.has(row.node_id) ? "checked" : ""} aria-label="选择 ${escapeHtml(row.remark || "节点")}">` : ""}</td>
       <td><span class="cell-main" title="${escapeHtml(row.remark)}">${escapeHtml(row.remark || "未命名")}</span><span class="cell-sub">${escapeHtml(row.protocol)} · ${escapeHtml(row.kernel || "")}</span></td>
       <td><span class="status-badge status-${status}">${statusText}</span></td>
       <td><span class="cell-main">${escapeHtml(row.exit_ip || "—")}</span><span class="cell-sub">${escapeHtml(row.server || "")}${row.port ? ` : ${escapeHtml(row.port)}` : ""}</span></td>
@@ -351,7 +416,32 @@ function renderRows() {
       <td><button class="row-action" data-detail="${index}" title="查看详情">···</button></td>
     </tr>`;
   }).join("");
+  $$('[data-node-select]').forEach(input => input.addEventListener("change", () => {
+    if (input.checked) state.selectedNodeIds.add(input.dataset.nodeSelect);
+    else state.selectedNodeIds.delete(input.dataset.nodeSelect);
+    updateSelectionSummary(allRows.length);
+    syncSelectPage(rows);
+  }));
+  syncSelectPage(rows);
   $$('[data-detail]').forEach(button => button.addEventListener("click", () => showDetail(rows[Number(button.dataset.detail)])));
+}
+
+function syncSelectPage(rows) {
+  const input = $("#selectPage");
+  const ids = rows.map(row => row.node_id).filter(Boolean);
+  const selected = ids.filter(id => state.selectedNodeIds.has(id)).length;
+  input.checked = ids.length > 0 && selected === ids.length;
+  input.indeterminate = selected > 0 && selected < ids.length;
+}
+
+function selectFilteredNodes() {
+  filteredRows().forEach(row => { if (row.node_id) state.selectedNodeIds.add(row.node_id); });
+  renderRows();
+}
+
+function clearSelectedNodes() {
+  state.selectedNodeIds.clear();
+  renderRows();
 }
 
 function showDetail(row) {
@@ -386,13 +476,40 @@ async function loadHistory() {
     const data = await api("/api/tasks");
     state.tasks = data.tasks || [];
     $("#historyCount").textContent = `显示 ${state.tasks.length}/${state.system?.settings?.history_limit || 10} 条`;
-    $("#historyList").innerHTML = state.tasks.length ? state.tasks.map(task => `<div class="history-item" data-task-id="${escapeHtml(task.id)}"><div><strong>${escapeHtml(task.kernel)} · ${escapeHtml(task.source_label)}</strong><small>${task.completed}/${task.total} · ${formatTime(task.created_at)}</small></div><b>${escapeHtml(task.status)}</b></div>`).join("") : '<p class="muted-copy">本机尚无任务记录</p>';
+    $("#historyList").innerHTML = state.tasks.length ? state.tasks.map(task => `<div class="history-item ${state.currentTask?.id === task.id ? "active" : ""}" data-task-id="${escapeHtml(task.id)}"><div><strong>${escapeHtml(task.name || `${task.kernel} · ${task.source_label}`)}</strong><small>${task.completed}/${task.total} · ${formatTime(task.created_at)}</small></div><div class="history-actions"><b>${escapeHtml(task.status)}</b><button type="button" data-rename-task="${escapeHtml(task.id)}" title="重命名任务" aria-label="重命名任务">✎</button></div></div>`).join("") : '<p class="muted-copy">本机尚无任务记录</p>';
     $$('[data-task-id]').forEach(item => item.addEventListener("click", async () => {
       state.currentTask = await api(`/api/tasks/${item.dataset.taskId}`);
+      state.page = 1;
       sessionStorage.setItem(SESSION_TASK_KEY, state.currentTask.id);
       renderTask();
+      await loadHistory();
+    }));
+    $$('[data-rename-task]').forEach(button => button.addEventListener("click", event => {
+      event.stopPropagation();
+      const task = state.tasks.find(item => item.id === button.dataset.renameTask);
+      state.renameTaskId = task?.id || null;
+      $("#renameTaskInput").value = task?.name || `${task?.kernel || "任务"} · ${task?.source_label || ""}`;
+      openModal("renameModal");
+      $("#renameTaskInput").focus();
+      $("#renameTaskInput").select();
     }));
   } catch {}
+}
+
+async function saveTaskName() {
+  if (!state.renameTaskId) return;
+  const name = $("#renameTaskInput").value.trim();
+  if (!name) return toast("任务名称不能为空", "error");
+  try {
+    const updated = await api(`/api/tasks/${state.renameTaskId}`, {method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({name})});
+    if (state.currentTask?.id === updated.id) {
+      state.currentTask = updated;
+      renderTask();
+    }
+    closeModal("renameModal");
+    await loadHistory();
+    toast("历史任务名称已保存", "success");
+  } catch (error) { toast(error.message, "error"); }
 }
 
 async function restoreSession() {
@@ -425,7 +542,9 @@ async function restoreSession() {
 }
 
 function populateProtocolFilter(protocols) {
+  const current = $("#protocolFilter").value;
   $("#protocolFilter").innerHTML = '<option value="">全部协议</option>' + protocols.map(protocol => `<option value="${escapeHtml(protocol)}">${escapeHtml(protocol)}</option>`).join("");
+  if (protocols.includes(current)) $("#protocolFilter").value = current;
 }
 
 function exportCurrent(format) {
@@ -454,10 +573,25 @@ function bindEvents() {
   $("#themeSelect").addEventListener("change", () => applyPreferences($("#themeSelect").value, $("#fontSizeSelect").value));
   $("#fontSizeSelect").addEventListener("change", () => applyPreferences($("#themeSelect").value, $("#fontSizeSelect").value));
   $("#saveSettings").addEventListener("click", saveSettings);
+  $("#saveTaskName").addEventListener("click", saveTaskName);
   $$('[data-close]').forEach(button => button.addEventListener("click", () => closeModal(button.dataset.close)));
   $$(".modal-backdrop").forEach(backdrop => backdrop.addEventListener("click", event => { if (event.target === backdrop) closeModal(backdrop.id); }));
   $("#selectDefaultProviders").addEventListener("click", () => $$("#providerList input").forEach(input => input.checked = input.dataset.default === "true"));
-  ["resultSearch","statusFilter","protocolFilter","riskFilter","typeFilter"].forEach(id => $("#" + id).addEventListener("input", renderRows));
+  ["resultSearch","statusFilter","protocolFilter","riskFilter","typeFilter"].forEach(id => $("#" + id).addEventListener("input", () => { state.page = 1; renderRows(); }));
+  $("#selectFiltered").addEventListener("click", selectFilteredNodes);
+  $("#clearSelection").addEventListener("click", clearSelectedNodes);
+  $("#selectPage").addEventListener("change", event => {
+    const allRows = filteredRows();
+    const start = (state.page - 1) * state.pageSize;
+    allRows.slice(start, start + state.pageSize).forEach(row => {
+      if (!row.node_id) return;
+      if (event.target.checked) state.selectedNodeIds.add(row.node_id);
+      else state.selectedNodeIds.delete(row.node_id);
+    });
+    renderRows();
+  });
+  $("#pagePrev").addEventListener("click", () => { state.page = Math.max(1, state.page - 1); renderRows(); });
+  $("#pageNext").addEventListener("click", () => { state.page += 1; renderRows(); });
   $("#exportCsv").addEventListener("click", () => exportCurrent("csv"));
   $("#exportJson").addEventListener("click", () => exportCurrent("json"));
   $("#exportMd").addEventListener("click", () => exportCurrent("md"));

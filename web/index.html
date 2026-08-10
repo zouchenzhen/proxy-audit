@@ -83,7 +83,7 @@
 
     <main class="workspace">
       <section class="overview-grid">
-        <article class="metric-card accent"><span>已导入</span><strong id="metricImported">—</strong><small id="metricProtocols">等待节点</small></article>
+        <article class="metric-card accent"><span id="metricImportedLabel">已导入</span><strong id="metricImported">—</strong><small id="metricProtocols">等待节点</small></article>
         <article class="metric-card"><span>检测成功</span><strong id="metricSuccess">—</strong><small id="metricSuccessRate">尚未运行</small></article>
         <article class="metric-card"><span>低风险出口</span><strong id="metricLowRisk">—</strong><small>基于已启用情报源</small></article>
         <article class="metric-card"><span>住宅 / 移动</span><strong id="metricCivilian">—</strong><small>并非“原生 IP”的同义词</small></article>
@@ -111,9 +111,19 @@
           <select id="riskFilter"><option value="">全部风险</option><option value="low">低风险</option><option value="medium">中风险</option><option value="high">高风险</option></select>
           <select id="typeFilter"><option value="">全部类型</option><option value="residential_or_business">住宅/商业</option><option value="mobile">移动网络</option><option value="datacenter">数据中心</option><option value="proxy_or_transit">代理/中转</option></select>
         </div>
+        <div class="selection-bar hidden" id="selectionBar">
+          <div><strong id="selectionCount">尚未手动选择（默认检测全部）</strong><small id="selectionFiltered"></small></div>
+          <div class="selection-actions">
+            <button class="small-button" id="selectFiltered">选择当前筛选结果</button>
+            <button class="small-button" id="clearSelection">清空选择</button>
+            <button class="small-button pager" id="pagePrev" aria-label="上一页">‹</button>
+            <span id="pageInfo">1 / 1</span>
+            <button class="small-button pager" id="pageNext" aria-label="下一页">›</button>
+          </div>
+        </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>节点</th><th>状态</th><th>出口 IP</th><th>位置 / ASN</th><th>网络类型</th><th>风险</th><th>延迟</th><th></th></tr></thead>
+            <thead><tr><th class="select-col hidden" id="selectColumn"><input type="checkbox" id="selectPage" aria-label="选择当前页全部节点"></th><th>节点</th><th>状态</th><th>出口 IP</th><th>位置 / ASN</th><th>网络类型</th><th>风险</th><th>延迟</th><th></th></tr></thead>
             <tbody id="resultBody"></tbody>
           </table>
           <div class="empty-state" id="emptyState">
@@ -140,7 +150,7 @@
     <section class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
       <header><div><span class="eyebrow">LOCAL VAULT</span><h2 id="settingsTitle">本机设置</h2><p>Key 仅保存在本机；Windows 使用当前用户 DPAPI 加密。</p></div><button class="icon-button" data-close="settingsModal">×</button></header>
       <div class="modal-body">
-        <div class="settings-section"><h3>IP 情报服务商</h3><div class="settings-grid" id="keySettings"></div></div>
+        <div class="settings-section"><h3>IP 情报服务商</h3><p class="settings-help">每个服务商可加入多个 Key（每行一个，最多 50 个）。后台会轮询使用，鉴权失败或额度受限时自动切换下一枚。</p><div class="settings-grid" id="keySettings"></div></div>
         <div class="settings-section"><h3>检测内核路径</h3>
           <label><span>sing-box.exe</span><input id="settingSingbox" placeholder="留空使用项目 bin/sing-box.exe"></label>
           <label><span>xray.exe</span><input id="settingXray" placeholder="留空自动发现 v2rayN 内核"></label>
@@ -163,6 +173,14 @@
     <section class="modal detail-modal" role="dialog" aria-modal="true">
       <header><div><span class="eyebrow">NODE PROFILE</span><h2 id="detailTitle">节点详情</h2></div><button class="icon-button" data-close="detailModal">×</button></header>
       <div class="modal-body" id="detailBody"></div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop hidden" id="renameModal">
+    <section class="modal rename-modal" role="dialog" aria-modal="true" aria-labelledby="renameTitle">
+      <header><div><span class="eyebrow">TASK LABEL</span><h2 id="renameTitle">重命名历史任务</h2><p>名称会保存在本机脱敏任务记录中。</p></div><button class="icon-button" data-close="renameModal">×</button></header>
+      <div class="modal-body"><label class="rename-field"><span>任务名称</span><input id="renameTaskInput" maxlength="80" placeholder="例如：香港节点晚间复测"></label></div>
+      <footer><button class="secondary" data-close="renameModal">取消</button><button class="primary" id="saveTaskName">保存名称</button></footer>
     </section>
   </div>
 
