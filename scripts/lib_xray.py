@@ -21,7 +21,6 @@ def resolve_xray_binary() -> Path:
         BIN_DIR / "xray",
         DEFAULT_BIN,
         Path(system_binary) if system_binary else None,
-        Path(r"E:\application\v2rayN-windows-64-SelfContained\bin\xray\xray.exe"),
     ]
     return next((path for path in candidates if path and path.is_file()), DEFAULT_BIN)
 

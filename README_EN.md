@@ -12,15 +12,15 @@ Proxy Audit is a Web UI for batch-testing proxy node connectivity and exit-IP qu
 
 ## Online demo (coming soon)
 
-Reserved entry: [https://zouchenzhen-zcz.hf.space](https://zouchenzhen-zcz.hf.space)
+Online address (not open yet): [https://zouchenzhen-zcz.hf.space](https://zouchenzhen-zcz.hf.space)
 
 > [!NOTE]
-> The ready-to-use browser demo is being prepared and reviewed by the hosting platform. It is not yet
-> available. This URL is reserved for the upcoming release; use the local edition in the meantime.
+> I am developing a browser-ready demo that will require no local installation. I will update its
+> availability here after stability and privacy validation; use the local edition in the meantime.
 
-The planned demo will require no local download. Its page and audit backend will run in the same
-Hugging Face Docker Space. After explicit consent, each browser tab will receive an anonymous
-temporary session and upload nodes, subscriptions, API keys, tasks, and results to the HF backend.
+The online demo will run its page and audit backend in the same ephemeral cloud environment. After
+explicit consent, each browser tab will receive an anonymous temporary session and upload nodes,
+subscriptions, API keys, tasks, and results to that temporary backend.
 
 - Proxy Audit keeps that data in one process's memory and task-scoped temporary files, not a database.
 - A session lasts at most one hour. Expiry or manual deletion invalidates it immediately and triggers
@@ -30,12 +30,9 @@ temporary session and upload nodes, subscriptions, API keys, tasks, and results 
 - Hugging Face and the selected subscription/intelligence/probe services still process data required
   for the request. Use the local edition for sensitive, large, or persistent workloads.
 
-The Space card links to the upstream licenses and corresponding-source archives shipped with the
-pinned sing-box and Xray builds under `/third-party/`.
-
-HF PRO is a paid subscription (currently US$9/month), not a free card-verification benefit. This
-deployment keeps the existing free `cpu-basic` hardware and does not request a paid upgrade. Free
-CPU Basic Spaces currently sleep after roughly 48 hours of inactivity and cold-start on a later visit.
+Before the demo opens, these rules may be adjusted based on validation results and the documentation
+will be updated accordingly. The deployed site will expose upstream licenses and corresponding-source
+archives for the pinned sing-box and Xray builds under `/third-party/`.
 
 API keys can be registered on each provider's official website. Free plans are generally sufficient
 for low-volume personal use; current quotas and terms are determined by each provider. Providers that
@@ -94,7 +91,7 @@ All screenshots below were generated in an isolated acceptance environment with 
 - The API never returns a complete saved key to the browser. The eye button reveals only a short prefix for identification.
 - Node credentials are used only in memory and one-time core configurations, which are deleted after each check.
 - New Web tasks remove UUIDs, passwords, subscription URLs, and log tails from saved and exported results.
-- The HF edition uploads operational data to its ephemeral backend; it does not persist a project database or include third-party analytics SDKs. The local edition does not send that data to a Proxy Audit backend.
+- The online demo will upload operational data to its ephemeral backend; it will not persist a project database or include third-party analytics SDKs. The local edition does not send that data to a Proxy Audit backend.
 - Both editions contact selected subscription servers, intelligence providers, and probe endpoints. Keep the local panel on `127.0.0.1` and do not expose it through a public tunnel.
 
 See [Privacy](PRIVACY.md), [Security Policy](SECURITY.md), and [Responsible Use](COMPLIANCE.md) for details. Never publish real subscriptions, node credentials, API keys, or identifiable result data in issues, pull requests, logs, or screenshots.
@@ -114,7 +111,7 @@ Browser acceptance uses a temporary headless Chrome profile. It exercises settin
 An optional privacy-safe live-network sampler is also available:
 
 ```powershell
-python tests/real_local_acceptance.py --db "E:\path\to\v2rayN\guiConfigs\guiNDB.db"
+python tests/real_local_acceptance.py --db "C:\path\to\v2rayN\guiConfigs\guiNDB.db"
 ```
 
 ## Scope and limitations

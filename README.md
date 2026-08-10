@@ -12,17 +12,16 @@ Windows 11 下的代理节点批量检测工具。目标是从 v2rayN 备份 / �
 
 治理与发布文档：[Security Policy](SECURITY.md) · [第三方许可](THIRD_PARTY_NOTICES.md) · [品牌使用](TRADEMARKS.md) · [公开发布检查清单](docs/PUBLIC_RELEASE_CHECKLIST.md) · [Apache-2.0](LICENSE)
 
-## 在线演示（即将上线）
+## 在线演示（即将开放）
 
-预留入口：[https://zouchenzhen-zcz.hf.space](https://zouchenzhen-zcz.hf.space)
+在线地址（暂未开放）：[https://zouchenzhen-zcz.hf.space](https://zouchenzhen-zcz.hf.space)
 
 > [!NOTE]
-> 浏览器开箱即用的在线演示版正在准备和平台审核中，暂时还不能使用。入口先保留在这里，
-> 完成部署与真实验收后会尽快开放；当前请使用下方本地版。
+> 我正在开发一个无需安装、打开浏览器即可使用的在线演示版。完成稳定性和隐私验收后，
+> 我会在这里更新开放状态；现在请先使用下方本地版。
 
-规划中的在线演示无需下载本地引擎。页面和检测后端将位于同一个 Hugging Face Docker
-Space：同意隐私提示后，每个浏览器标签页会创建一个匿名临时会话，节点、订阅、API Key、
-任务和结果会上传到 HF 后端处理。
+在线演示版开放后，页面和检测后端将位于同一个临时云端环境。同意隐私提示后，每个浏览器
+标签页会创建一个匿名临时会话，节点、订阅、API Key、任务和结果会上传到临时后端处理。
 
 - 数据只保存在单进程内存和任务期临时文件，不写入数据库或项目历史；会话最长一小时；
 - 到期或点击“立即取消并删除会话”会立即使会话失效并触发取消与清理；已经开始的单次
@@ -32,14 +31,9 @@ Space：同意隐私提示后，每个浏览器标签页会创建一个匿名临
 - Hugging Face、订阅服务器、IP 情报商和测试端点仍会处理完成请求所必需的数据。高敏感、
   大批量或需要持久历史的场景请使用下方本地版。
 
-完整边界见[隐私说明](PRIVACY.md)。Cloudflare Pages 的跳转包会等在线演示完成部署和验收
-后再启用，避免把用户导向尚不可用的页面。
-HF 镜像分发的固定版本内核许可证与对应源码归档也通过在线站点的 `/third-party/` 路径提供，
-具体链接见 Space 说明页。
-
-> HF 费用说明：PRO 是实际付费订阅（当前官方标价 US$9/月）并会续费；仅绑定银行卡或
-> 完成 0 元支付验证不会免费获得 PRO。这个部署保留现有 `cpu-basic` 免费硬件，不启用
-> 付费升级；免费 Space 当前在连续约 48 小时无访问后会休眠，之后访问会触发冷启动。
+完整边界见[隐私说明](PRIVACY.md)。在线演示正式开放前，这些规则仍可能根据实际验收结果
+调整；开放时会同步更新文档。云端镜像分发的固定版本内核许可证与对应源码归档将通过
+在线站点的 `/third-party/` 路径提供。
 
 IPinfo、IP2Location、IPQualityScore、Scamalytics、AbuseIPDB 等服务的 Key 可在各自官网
 自行注册获取。它们的免费额度通常已经足够个人低频检测；具体额度和条款以服务商官网
@@ -64,7 +58,7 @@ cd proxy-audit
 
 浏览器会打开 `http://127.0.0.1:8765`。面板只监听本机，不对局域网或公网开放。
 
-云端版与本地版共用主要界面功能；本地版另提供加密持久 Key、最多一万节点导入和最近
+计划中的在线演示版与本地版共用主要界面功能；本地版另提供加密持久 Key、最多一万节点导入和最近
 任务历史。Web UI 现已支持：
 
 - 粘贴分享链接、Base64 订阅正文、订阅 URL、TXT、v2rayN 备份 ZIP、`guiNDB.db`
@@ -131,7 +125,7 @@ python -m unittest discover -s tests -v
 python scripts/scan_git_history.py
 python tests/ui_browser_acceptance.py
 python tests/ui_online_acceptance.py --url "https://zouchenzhen-zcz.hf.space/"
-python tests/real_local_acceptance.py --db "E:\\path\\to\\v2rayN\\guiConfigs\\guiNDB.db"
+python tests/real_local_acceptance.py --db "C:\\path\\to\\v2rayN\\guiConfigs\\guiNDB.db"
 ```
 
 最后一条是可选的真实网络验收：默认每个“内核 × 协议”抽样 3 个节点，仅调用
@@ -142,7 +136,7 @@ python tests/real_local_acceptance.py --db "E:\\path\\to\\v2rayN\\guiConfigs\\gu
 
 ## 当前能力与验收边界
 
-2026-08-08 使用本机当前 v2rayN 数据库做过隐私安全的抽样验收：
+2026-08-08 使用一份本地 v2rayN 数据库完成了隐私安全的抽样验收：
 
 | 协议 | sing-box | Xray | 本轮真实出口 |
 |---|---|---|---|
@@ -152,7 +146,7 @@ python tests/real_local_acceptance.py --db "E:\\path\\to\\v2rayN\\guiConfigs\\gu
 | Shadowsocks | 配置校验通过 | 配置校验通过 | 抽样节点均不可达；插件传输暂不支持 |
 | Hysteria2 | 配置校验通过 | 不支持 | sing-box 成功 |
 | TUIC | 配置校验通过 | 不支持 | sing-box 成功 |
-| AnyTLS | 配置校验通过 | 不支持 | 本轮抽样节点不可达；历史批次有成功样本 |
+| AnyTLS | 配置校验通过 | 不支持 | 本轮抽样节点不可达 |
 
 “配置校验通过”表示已安装内核真实接受生成的 JSON，不等于任意第三方节点一定在线。
 完整、去标识化的验收记录见 `docs/acceptance-2026-08-08.md`。
