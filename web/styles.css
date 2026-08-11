@@ -122,6 +122,7 @@ button.danger { height: 37px; border: 1px solid rgba(255,96,116,.35); background
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 9px; }
 .two-col label span, .settings-section label span { display: block; margin: 0 0 5px; color: var(--muted); font-size: 9px; }
 .provider-list { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.provider-legend { margin:7px 0 0;color:var(--muted-2);font-size:calc(8px + var(--font-boost));line-height:1.45; }
 .check-tile { min-width: 0; display: flex; align-items: center; gap: 7px; height: 31px; padding: 0 8px; border: 1px solid var(--line-soft); border-radius: 7px; background: #0a0e13; color: #abb4bf; font-size: 9px; cursor: pointer; }
 .check-tile input { width: 12px; height: 12px; accent-color: var(--lime-2); }
 .check-tile em { margin-left: auto; width: 5px; height: 5px; border-radius: 50%; background: var(--muted-2); }
@@ -262,6 +263,7 @@ tbody tr:hover { background: #10161e; }
 .key-field label b { color:var(--green);font-size:8px; }
 .key-input-row { min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:start;gap:6px; }
 .key-input-row > input { min-width:0; }
+.key-help { margin:6px 0 0;color:#78909d;font-size:calc(8px + var(--font-boost));line-height:1.45; }
 .secret-entry { min-width:0;min-height:68px;height:68px;resize:vertical;-webkit-text-security:disc; }
 .saved-key-list { display:flex;flex-wrap:wrap;gap:5px;margin:0 0 7px; }
 .saved-key { display:inline-flex;align-items:center;gap:4px;max-width:100%;padding:4px 5px 4px 7px;border:1px solid var(--line-soft);border-radius:6px;background:#0a0e13;color:#b7c2cf; }

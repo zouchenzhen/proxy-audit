@@ -11,7 +11,7 @@ from lib_secrets import load_settings, normalize_secret_values, secret_id
 
 PROVIDER_META = [
     {"id": "ip_api", "name": "IP-API", "key_field": "", "default": True},
-    {"id": "ipapi_is", "name": "ipapi.is", "key_field": "", "default": True},
+    {"id": "ipapi_is", "name": "ipapi.is", "key_field": "ipapi_is_api_key", "default": True},
     {"id": "ipinfo", "name": "IPinfo", "key_field": "ipinfo_api_key", "default": True},
     {"id": "ip2location", "name": "IP2Location", "key_field": "ip2location_api_key", "default": True},
     {"id": "ipqs", "name": "IPQualityScore", "key_field": "ipqs_api_key", "default": True},
@@ -166,7 +166,14 @@ def fetch_scamalytics(ip: str, timeout: int = 15, cfg=None) -> Dict[str, Any]:
 
 
 def fetch_ipapi_is(ip: str, timeout: int = 15, cfg=None) -> Dict[str, Any]:
-    return _get_json(_session_with_socks(), "https://api.ipapi.is/", timeout, params={"q": ip})
+    cfg = load_local_config() if cfg is None else cfg
+    session = _session_with_socks()
+    return _request_with_key_pool(
+        "ipapi_is_api_key",
+        cfg,
+        lambda key: _get_json(session, "https://api.ipapi.is/", timeout, params={"q": ip, "key": key}),
+        fallback=lambda: _get_json(session, "https://api.ipapi.is/", timeout, params={"q": ip}),
+    )
 
 
 def fetch_abuseipdb(ip: str, timeout: int = 15, cfg=None) -> Dict[str, Any]:

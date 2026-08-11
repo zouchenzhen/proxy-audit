@@ -13,6 +13,7 @@ from lib_paths import ROOT
 SECURE_CONFIG = ROOT / "config.secure.json"
 LEGACY_CONFIG = ROOT / "config.local.json"
 SECRET_FIELDS = {
+    "ipapi_is_api_key",
     "ip2location_api_key",
     "ipinfo_api_key",
     "ipqs_api_key",
@@ -29,6 +30,7 @@ ALLOWED_FIELDS = SECRET_FIELDS | {
 }
 MAX_KEYS_PER_PROVIDER = 50
 ENV_SECRET_PREFIXES = {
+    "ipapi_is_api_key": "PROXY_AUDIT_IPAPI_IS_API_KEY",
     "ip2location_api_key": "PROXY_AUDIT_IP2LOCATION_API_KEY",
     "ipinfo_api_key": "PROXY_AUDIT_IPINFO_API_KEY",
     "ipqs_api_key": "PROXY_AUDIT_IPQS_API_KEY",

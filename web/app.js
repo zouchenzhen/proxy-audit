@@ -38,12 +38,20 @@ function migrateLegacyStorage() {
 }
 
 const keyLabels = {
+  ipapi_is_api_key: "ipapi.is API Key（可选）",
   ipinfo_api_key: "IPinfo API Token",
   ip2location_api_key: "IP2Location API Key",
   ipqs_api_key: "IPQualityScore API Key",
   scamalytics_user: "Scamalytics Username",
   scamalytics_api_key: "Scamalytics API Key",
   abuseipdb_api_key: "AbuseIPDB API Key",
+};
+
+const keyHelp = {
+  ipapi_is_api_key: "对应 ipapi.is 账户首页右侧 API Credentials；不填仍可匿名查询。",
+  scamalytics_user: "申请后由 Scamalytics 邮件提供 Username；本机已配置时留空即可。",
+  scamalytics_api_key: "申请后由 Scamalytics 邮件提供 API Key；本机已配置时留空即可。",
+  abuseipdb_api_key: "AbuseIPDB 登录后进入 API → API Settings 创建。",
 };
 
 function escapeHtml(value) {
@@ -139,7 +147,7 @@ async function loadSystem() {
       $("#timeout").max = 12;
       $("#nodeLimit").max = state.system.limits.max_nodes_per_task;
       $("#uploadLimitHint").textContent = "TXT / ZIP / guiNDB.db · 最大 4 MB；每次最多 20 节点";
-      $("#keyLimitHelp").textContent = `每个服务商可加入多个 Key（每行一个，本次会话最多 ${state.system.limits.max_keys_per_provider} 个）。后台会轮询使用，鉴权失败或额度受限时自动切换下一枚。`;
+      $("#keyLimitHelp").textContent = `IP-API 无需注册或 Key；IP-API 与 ipapi.is 是两个不同服务。其余服务商可加入多个授权 Key（每行一个，本次会话最多 ${state.system.limits.max_keys_per_provider} 个），鉴权失败或额度受限时自动切换。`;
     }
     return true;
   } catch (error) {
@@ -167,12 +175,16 @@ function renderKernels() {
 
 function renderProviders() {
   const configured = state.system?.settings?.configured || {};
-  $("#providerList").innerHTML = (state.system?.providers || []).map(provider => `
-    <label class="check-tile" title="${provider.key_field ? "可在设置中填写 Key" : "无需 Key"}">
+  $("#providerList").innerHTML = (state.system?.providers || []).map(provider => {
+    const hasKey = Boolean(provider.key_field && configured[provider.key_field]);
+    const status = !provider.key_field ? "无需 Key" : hasKey ? "Key 已配置" : provider.id === "ipapi_is" ? "未配置 Key，匿名可用" : "可在设置中填写 Key";
+    return `
+    <label class="check-tile" title="${escapeHtml(status)}">
       <input type="checkbox" value="${escapeHtml(provider.id)}" data-default="${provider.default}" ${provider.default ? "checked" : ""}>
       <span>${escapeHtml(provider.name)}</span>
-      <em class="${provider.key_field && configured[provider.key_field] ? "configured" : ""}"></em>
-    </label>`).join("");
+      <em class="${hasKey ? "configured" : ""}" aria-label="${escapeHtml(status)}"></em>
+    </label>`;
+  }).join("");
 }
 
 function renderServices() {
@@ -190,7 +202,7 @@ function renderSettings() {
   const settings = state.system?.settings || {};
   const configured = settings.configured || {};
   const previews = settings.key_previews || {};
-  const fields = ["ipinfo_api_key", "ip2location_api_key", "ipqs_api_key", "scamalytics_user", "scamalytics_api_key", "abuseipdb_api_key"];
+  const fields = ["ipapi_is_api_key", "ipinfo_api_key", "ip2location_api_key", "ipqs_api_key", "scamalytics_user", "scamalytics_api_key", "abuseipdb_api_key"];
   state.pendingKeyRemovals = {};
   $("#keySettings").innerHTML = fields.map(field => {
     const isSecret = field !== "scamalytics_user";
@@ -210,6 +222,7 @@ function renderSettings() {
           : `<input type="text" data-setting="${field}" autocomplete="off" placeholder="${isConfigured ? "留空保留现有值" : "未配置"}">`}
         ${isConfigured ? `<label class="clear-option" title="勾选后保存将清除此项"><input type="checkbox" data-clear="${field}"><span>清空</span></label>` : ""}
       </div>
+      ${keyHelp[field] ? `<p class="key-help">${escapeHtml(keyHelp[field])}</p>` : ""}
     </div>`;
   }).join("");
   $$('[data-key-eye]').forEach(button => button.addEventListener("click", () => {

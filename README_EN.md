@@ -101,6 +101,12 @@ For optional process-only injection with 1Password CLI, copy `config.1password.e
 `./start-web-1password.ps1`. The profile stores references only. Runtime keys are not copied into
 `config.secure.json` when other settings are saved through the UI.
 
+IP-API's free endpoint requires neither registration nor a key. IP-API and ipapi.is are separate
+providers: an ipapi.is key is optional, and the anonymous free tier remains available when it is
+left blank. Registered users can copy the key shown under `API Credentials` into the settings
+panel. Scamalytics sends the API username, key, documentation, and access details after reviewing
+the registration request.
+
 ## Tests
 
 ```powershell

@@ -62,6 +62,7 @@
         </div>
         <label class="field-label">IP 情报源 <button class="text-button" id="selectDefaultProviders">恢复默认</button></label>
         <div class="provider-list" id="providerList"></div>
+        <p class="provider-legend">绿点表示已配置 Key；灰点不代表不可用。IP-API 无需 Key，ipapi.is 未填 Key 时使用匿名额度。</p>
         <details class="optional-block">
           <summary>可选网络探测 <span>默认精简</span></summary>
           <label class="switch-line"><input type="checkbox" id="qualityProbe" checked><i></i><span>延迟与抖动采样（2 次）</span></label>
@@ -167,7 +168,7 @@
     <section class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
       <header><div><span class="eyebrow" id="settingsEyebrow">LOCAL VAULT</span><h2 id="settingsTitle">本机设置</h2><p id="settingsSubtitle">Key 仅保存在本机；Windows 使用当前用户 DPAPI 加密。</p></div><button class="icon-button" data-close="settingsModal">×</button></header>
       <div class="modal-body">
-        <div class="settings-section"><h3>IP 情报服务商</h3><p class="settings-help" id="keyLimitHelp">每个服务商可加入多个 Key（每行一个，最多 50 个）。后台会轮询使用，鉴权失败或额度受限时自动切换下一枚。</p><div class="settings-grid" id="keySettings"></div></div>
+        <div class="settings-section"><h3>IP 情报服务商</h3><p class="settings-help" id="keyLimitHelp">IP-API 无需注册或 Key；IP-API 与 ipapi.is 是两个不同服务。其余服务商可加入多个授权 Key（每行一个，最多 50 个），鉴权失败或额度受限时自动切换下一枚。</p><div class="settings-grid" id="keySettings"></div></div>
         <div class="settings-section local-copy"><h3>检测内核路径</h3>
           <label><span>sing-box.exe</span><input id="settingSingbox" placeholder="留空使用项目 bin/sing-box.exe"></label>
           <label><span>xray.exe</span><input id="settingXray" placeholder="留空自动发现 v2rayN 内核"></label>

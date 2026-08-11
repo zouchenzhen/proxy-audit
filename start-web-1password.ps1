@@ -8,8 +8,16 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$op = Get-Command op -ErrorAction SilentlyContinue
-if (-not $op) {
+$opCommand = Get-Command op -ErrorAction SilentlyContinue
+$opPath = if ($opCommand) { $opCommand.Source } else { $null }
+if (-not $opPath) {
+    $opCandidates = @(
+        (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links\op.exe'),
+        (Join-Path $env:ProgramFiles '1Password CLI\op.exe')
+    )
+    $opPath = $opCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+}
+if (-not $opPath) {
     throw '未找到 1Password CLI（op）。请先安装并启用桌面端 CLI 集成。'
 }
 if (-not (Test-Path -LiteralPath $ProfilePath)) {
@@ -25,5 +33,5 @@ $childArgs = @(
 if ($NoOpen) { $childArgs += '-NoOpen' }
 if ($SkipCoreDownload) { $childArgs += '-SkipCoreDownload' }
 
-& $op.Source run "--env-file=$ProfilePath" -- powershell.exe @childArgs
+& $opPath run "--env-file=$ProfilePath" -- powershell.exe @childArgs
 exit $LASTEXITCODE

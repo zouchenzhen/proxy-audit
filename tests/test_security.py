@@ -70,6 +70,19 @@ class SecureSettingsTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(attempts, ["bad-key", "good-key"])
 
+    def test_ipapi_is_uses_optional_key_and_supports_keyless_fallback(self):
+        def fake_get_json(session, url, timeout, headers=None, params=None):
+            return dict(params or {})
+
+        with patch.object(lib_ipintel, "_get_json", side_effect=fake_get_json):
+            authenticated = lib_ipintel.fetch_ipapi_is(
+                "8.8.8.8", cfg={"ipapi_is_api_key": ["registered-key"]}
+            )
+            anonymous = lib_ipintel.fetch_ipapi_is("1.1.1.1", cfg={})
+
+        self.assertEqual(authenticated, {"q": "8.8.8.8", "key": "registered-key"})
+        self.assertEqual(anonymous, {"q": "1.1.1.1"})
+
     def test_history_limit_is_bounded_and_public(self):
         with tempfile.TemporaryDirectory() as directory:
             secure = Path(directory) / "config.secure.json"
@@ -84,6 +97,7 @@ class SecureSettingsTests(unittest.TestCase):
             legacy = Path(directory) / "config.local.json"
             legacy.write_text(json.dumps({"ipinfo_api_key": "legacy-secret"}), encoding="utf-8")
             runtime = {
+                "PROXY_AUDIT_IPAPI_IS_API_KEY_1": "runtime-ipapi-is",
                 "PROXY_AUDIT_IPINFO_API_KEY_1": "runtime-one",
                 "PROXY_AUDIT_IPINFO_API_KEY_2": "runtime-two",
                 "PROXY_AUDIT_SCAMALYTICS_USER": "runtime-user",
@@ -91,6 +105,7 @@ class SecureSettingsTests(unittest.TestCase):
             with patch.object(lib_secrets, "SECURE_CONFIG", secure), patch.object(lib_secrets, "LEGACY_CONFIG", legacy):
                 with patch.dict(os.environ, runtime, clear=False):
                     loaded = lib_secrets.load_settings()
+                    self.assertEqual(loaded["ipapi_is_api_key"], ["runtime-ipapi-is"])
                     self.assertEqual(loaded["ipinfo_api_key"], ["runtime-one", "runtime-two"])
                     self.assertEqual(loaded["scamalytics_user"], "runtime-user")
                     lib_secrets.save_settings({"history_limit": 22})
@@ -98,6 +113,7 @@ class SecureSettingsTests(unittest.TestCase):
                 self.assertEqual(persisted["ipinfo_api_key"], ["legacy-secret"])
                 self.assertNotIn("runtime-one", persisted["ipinfo_api_key"])
                 self.assertNotIn("runtime-two", persisted["ipinfo_api_key"])
+                self.assertNotIn("ipapi_is_api_key", persisted)
                 self.assertNotIn("scamalytics_user", persisted)
                 self.assertEqual(persisted["history_limit"], 22)
 

@@ -219,6 +219,7 @@ def main():
         assert geometry["cardOverflow"] <= 1, geometry
         assert geometry["dockOverlap"] <= 1, geometry
         assert geometry["railScrollable"], geometry
+        assert cdp.evaluate("document.querySelector('.provider-legend').textContent.includes('灰点不代表不可用')")
 
         cdp.evaluate("document.querySelector('#settingsButton').click()")
         wait_for(lambda: cdp.evaluate("!document.querySelector('#settingsModal').classList.contains('hidden')"), message="settings modal")
@@ -238,6 +239,8 @@ def main():
               keyEyes: document.querySelectorAll('[data-key-eye]').length,
               keyEyeSvgs: document.querySelectorAll('[data-key-eye] svg.key-eye-icon').length,
               keyEyePressed: document.querySelector('[data-key-eye]').getAttribute('aria-pressed'),
+              ipapiKeyField: Boolean(document.querySelector('[data-setting="ipapi_is_api_key"]')),
+              credentialHelp: document.querySelector('#keySettings').textContent.includes('API Credentials'),
               footerButtonSizes: [...document.querySelectorAll('.settings-modal footer button')].map(button => {
                 const rect = button.getBoundingClientRect();
                 return {width: rect.width, height: rect.height};
@@ -248,9 +251,11 @@ def main():
         assert modal["bodyLocked"], modal
         assert modal["viewportFit"], modal
         assert modal["fieldOverflow"] == 0, modal
-        assert modal["keyPoolInputs"] == 5, modal
-        assert modal["keyEyes"] == 5, modal
-        assert modal["keyEyeSvgs"] == 5, modal
+        assert modal["keyPoolInputs"] == 6, modal
+        assert modal["keyEyes"] == 6, modal
+        assert modal["keyEyeSvgs"] == 6, modal
+        assert modal["ipapiKeyField"], modal
+        assert modal["credentialHelp"], modal
         assert modal["keyEyePressed"] == "false", modal
         assert len(modal["footerButtonSizes"]) == 2, modal
         assert abs(modal["footerButtonSizes"][0]["width"] - modal["footerButtonSizes"][1]["width"]) <= 1, modal
