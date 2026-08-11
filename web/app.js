@@ -49,10 +49,19 @@ const keyLabels = {
 
 const keyHelp = {
   ipapi_is_api_key: "对应 ipapi.is 账户首页右侧 API Credentials；不填仍可匿名查询。",
-  scamalytics_user: "申请后由 Scamalytics 邮件提供 Username；本机已配置时留空即可。",
-  scamalytics_api_key: "申请后由 Scamalytics 邮件提供 API Key；本机已配置时留空即可。",
   abuseipdb_api_key: "AbuseIPDB 登录后进入 API → API Settings 创建。",
 };
+
+const anonymousProviderIds = new Set(["ip_api", "ipapi_is", "ip2location"]);
+const providerGuides = [
+  {id:"ip_api", name:"IP-API", key:"无需 Key", quota:"45 次/分钟（按客户端公网 IP）", note:"免费端点仅限非商业用途，使用 HTTP。", url:"https://ip-api.com/docs/legal"},
+  {id:"ipapi_is", name:"ipapi.is", key:"Key 可选", quota:"1,000 次/天", note:"未填 Key 可匿名使用；免费层用于测试与开发。", url:"https://ipapi.is/pricing.html"},
+  {id:"ipinfo", name:"IPinfo Lite", key:"需要 Token", quota:"认证请求不限量", note:"免费层仅含国家、洲和基础 ASN；公开使用需署名。", url:"https://ipinfo.io/lite"},
+  {id:"ip2location", name:"IP2Location", key:"Key 可选", quota:"无 Key 1,000 次/天；免费 Key 50,000 次/月", note:"免费与免 Key 模式均要求署名。", url:"https://www.ip2location.io/pricing"},
+  {id:"ipqs", name:"IPQualityScore", key:"需要 Key", quota:"1,000 次/月，且最多 35 次/天", note:"每人或每公司仅限一个免费账户。", url:"https://www.ipqualityscore.com/plans"},
+  {id:"scamalytics", name:"Scamalytics", key:"需要 Username + API Key", quota:"5,000 次/月", note:"凭据由申请邮件提供；本工具按配对凭据轮换。", url:"https://scamalytics.com/ip/api/pricing"},
+  {id:"abuseipdb", name:"AbuseIPDB", key:"需要 Key", quota:"1,000 次 IP 检查/天；100 次 Block Check/天", note:"每人仅限一个账户；免费计划仅限非商业个人项目。", url:"https://www.abuseipdb.com/pricing"},
+];
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>'"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[ch]));
@@ -147,7 +156,7 @@ async function loadSystem() {
       $("#timeout").max = 12;
       $("#nodeLimit").max = state.system.limits.max_nodes_per_task;
       $("#uploadLimitHint").textContent = "TXT / ZIP / guiNDB.db · 最大 4 MB；每次最多 20 节点";
-      $("#keyLimitHelp").textContent = `IP-API 无需注册或 Key；IP-API 与 ipapi.is 是两个不同服务。其余服务商可加入多个授权 Key（每行一个，本次会话最多 ${state.system.limits.max_keys_per_provider} 个），鉴权失败或额度受限时自动切换。`;
+      $("#keyLimitHelp").textContent = `绿点只表示凭据已保存，不代表服务商刚刚验证成功或仍有额度；蓝点表示无需 Key 或使用官方匿名模式；灰点表示未保存凭据。普通 Key 每行一个（本次会话最多 ${state.system.limits.max_keys_per_provider} 个），Scamalytics 按 Username + API Key 成组保存。`;
     }
     return true;
   } catch (error) {
@@ -177,12 +186,13 @@ function renderProviders() {
   const configured = state.system?.settings?.configured || {};
   $("#providerList").innerHTML = (state.system?.providers || []).map(provider => {
     const hasKey = Boolean(provider.key_field && configured[provider.key_field]);
-    const status = !provider.key_field ? "无需 Key" : hasKey ? "Key 已配置" : provider.id === "ipapi_is" ? "未配置 Key，匿名可用" : "可在设置中填写 Key";
+    const anonymous = !hasKey && anonymousProviderIds.has(provider.id);
+    const status = hasKey ? "已保存凭据（未实时验证）" : anonymous ? "无需 Key／正在使用官方匿名模式" : "未保存凭据；可能降级或跳过";
     return `
     <label class="check-tile" title="${escapeHtml(status)}">
       <input type="checkbox" value="${escapeHtml(provider.id)}" data-default="${provider.default}" ${provider.default ? "checked" : ""}>
       <span>${escapeHtml(provider.name)}</span>
-      <em class="${hasKey ? "configured" : ""}" aria-label="${escapeHtml(status)}"></em>
+      <em class="${hasKey ? "configured" : anonymous ? "anonymous" : ""}" aria-label="${escapeHtml(status)}"></em>
     </label>`;
   }).join("");
 }
@@ -198,33 +208,84 @@ function keyVisibilityIcon(visible) {
     : `<svg class="key-eye-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>`;
 }
 
+function genericKeyFieldHtml(field, settings, configured, previews) {
+  const isConfigured = Boolean(configured[field]);
+  const saved = previews[field] || [];
+  const savedKeys = saved.length ? `<div class="saved-key-list" data-key-list="${field}">${saved.map((item, index) => `
+    <span class="saved-key" data-key-id="${escapeHtml(item.id)}">
+      <code data-masked="${escapeHtml(item.masked)}" data-prefix="${escapeHtml(item.prefix)}">Key ${index + 1} · ${escapeHtml(item.masked)}</code>
+      <button type="button" class="key-remove" data-remove-key="${escapeHtml(field)}" data-remove-id="${escapeHtml(item.id)}" title="保存后移除此 Key">×</button>
+    </span>`).join("")}</div>` : "";
+  return `<div class="key-field ${field === "abuseipdb_api_key" ? "full-width-key-field" : ""}">
+    <label><span>${escapeHtml(keyLabels[field])}</span>${isConfigured ? `<b>${saved.length} 个 Key</b>` : ""}</label>
+    ${savedKeys}
+    <div class="key-input-row">
+      <textarea class="secret-entry" data-setting="${field}" autocomplete="off" spellcheck="false" placeholder="${isConfigured ? "每行添加一个新 Key；留空保留" : "每行填写一个 Key"}"></textarea>
+      <button type="button" class="key-eye" data-key-eye="${field}" title="仅显示已保存 Key 的短前缀" aria-label="显示 Key 短前缀" aria-pressed="false">${keyVisibilityIcon(false)}</button>
+      ${isConfigured ? `<label class="clear-option" title="勾选后保存将清除此项"><input type="checkbox" data-clear="${field}"><span>清空</span></label>` : ""}
+    </div>
+    ${keyHelp[field] ? `<p class="key-help">${escapeHtml(keyHelp[field])}</p>` : ""}
+  </div>`;
+}
+
+function scamalyticsPairRowHtml() {
+  return `<div class="scamalytics-pair-row">
+    <input type="password" data-scamalytics-username autocomplete="off" spellcheck="false" placeholder="Username" aria-label="Scamalytics Username">
+    <input type="password" data-scamalytics-key autocomplete="off" spellcheck="false" placeholder="API Key" aria-label="Scamalytics API Key">
+    <button type="button" class="key-eye" data-scamalytics-row-eye title="显示这一组凭据" aria-label="显示这一组凭据" aria-pressed="false">${keyVisibilityIcon(false)}</button>
+    <button type="button" class="key-remove scamalytics-row-remove" data-remove-scamalytics-row title="移除这一输入行" aria-label="移除这一输入行">×</button>
+  </div>`;
+}
+
+function scamalyticsFieldHtml(settings, configured, previews) {
+  const field = "scamalytics_credentials";
+  const saved = previews[field] || [];
+  const isConfigured = Boolean(configured[field]);
+  const savedPairs = saved.length ? `<div class="saved-pair-row">
+    <div class="saved-key-list" data-key-list="${field}">${saved.map((item, index) => `
+      <span class="saved-key" data-key-id="${escapeHtml(item.id)}">
+        <code data-masked="${escapeHtml(item.masked)}" data-prefix="${escapeHtml(item.prefix)}">Pair ${index + 1} · ${escapeHtml(item.masked)}</code>
+        <button type="button" class="key-remove" data-remove-key="${field}" data-remove-id="${escapeHtml(item.id)}" title="保存后移除此配对">×</button>
+      </span>`).join("")}</div>
+    <button type="button" class="key-eye" data-key-eye="${field}" title="显示用户名和 Key 的短前缀" aria-label="显示配对凭据短前缀" aria-pressed="false">${keyVisibilityIcon(false)}</button>
+    ${isConfigured ? `<label class="clear-option" title="勾选后保存将清除全部配对"><input type="checkbox" data-clear="${field}"><span>清空全部</span></label>` : ""}
+  </div>` : "";
+  return `<div class="key-field scamalytics-pair-field">
+    <label><span>Scamalytics 配对凭据</span>${isConfigured ? `<b>${saved.length} 组</b>` : ""}</label>
+    ${savedPairs}
+    <div class="scamalytics-pair-inputs" id="scamalyticsPairInputs">${scamalyticsPairRowHtml()}</div>
+    <button type="button" class="small-button add-credential-pair" id="addScamalyticsPair">＋ 添加另一组 Username + API Key</button>
+    <p class="key-help">每组 Username 只与同一行的 API Key 配对轮换；两项一起加密保存。小眼睛仅在本机输入时显示全文，已保存项只显示短前缀。</p>
+  </div>`;
+}
+
+function renderProviderGuide(settings) {
+  const configured = settings.configured || {};
+  const meta = Object.fromEntries((state.system?.providers || []).map(item => [item.id, item]));
+  $("#providerGuideList").innerHTML = providerGuides.map(item => {
+    const provider = meta[item.id] || {};
+    const hasCredential = Boolean(provider.key_field && configured[provider.key_field]);
+    const anonymous = !hasCredential && anonymousProviderIds.has(item.id);
+    const modeClass = hasCredential ? "configured" : anonymous ? "anonymous" : "missing";
+    const mode = hasCredential ? "已保存凭据（未实时验证）" : anonymous ? "官方免 Key／匿名模式" : "未保存凭据；可能降级或跳过";
+    return `<article class="provider-guide-row">
+      <div><span class="provider-state-dot ${modeClass}"></span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(mode)}</small></div>
+      <div><b>${escapeHtml(item.key)}</b><span>${escapeHtml(item.quota)}</span><small>${escapeHtml(item.note)}</small></div>
+      <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">官方说明 ↗</a>
+    </article>`;
+  }).join("");
+}
+
 function renderSettings() {
   const settings = state.system?.settings || {};
   const configured = settings.configured || {};
   const previews = settings.key_previews || {};
-  const fields = ["ipapi_is_api_key", "ipinfo_api_key", "ip2location_api_key", "ipqs_api_key", "scamalytics_user", "scamalytics_api_key", "abuseipdb_api_key"];
+  const fields = ["ipapi_is_api_key", "ipinfo_api_key", "ip2location_api_key", "ipqs_api_key"];
   state.pendingKeyRemovals = {};
-  $("#keySettings").innerHTML = fields.map(field => {
-    const isSecret = field !== "scamalytics_user";
-    const isConfigured = field === "scamalytics_user" ? settings.scamalytics_user_configured : configured[field];
-    const saved = isSecret ? (previews[field] || []) : [];
-    const savedKeys = saved.length ? `<div class="saved-key-list" data-key-list="${field}">${saved.map((item, index) => `
-      <span class="saved-key" data-key-id="${escapeHtml(item.id)}">
-        <code data-masked="${escapeHtml(item.masked)}" data-prefix="${escapeHtml(item.prefix)}">Key ${index + 1} · ${escapeHtml(item.masked)}</code>
-        <button type="button" class="key-remove" data-remove-key="${escapeHtml(field)}" data-remove-id="${escapeHtml(item.id)}" title="保存后移除此 Key">×</button>
-      </span>`).join("")}</div>` : "";
-    return `<div class="key-field">
-      <label><span>${escapeHtml(keyLabels[field])}</span>${isConfigured ? `<b>${isSecret ? `${saved.length} 个 Key` : "已配置"}</b>` : ""}</label>
-      ${savedKeys}
-      <div class="key-input-row">
-        ${isSecret
-          ? `<textarea class="secret-entry" data-setting="${field}" autocomplete="off" spellcheck="false" placeholder="${isConfigured ? "每行添加一个新 Key；留空保留" : "每行填写一个 Key"}"></textarea><button type="button" class="key-eye" data-key-eye="${field}" title="仅显示已保存 Key 的短前缀" aria-label="显示 Key 短前缀" aria-pressed="false">${keyVisibilityIcon(false)}</button>`
-          : `<input type="text" data-setting="${field}" autocomplete="off" placeholder="${isConfigured ? "留空保留现有值" : "未配置"}">`}
-        ${isConfigured ? `<label class="clear-option" title="勾选后保存将清除此项"><input type="checkbox" data-clear="${field}"><span>清空</span></label>` : ""}
-      </div>
-      ${keyHelp[field] ? `<p class="key-help">${escapeHtml(keyHelp[field])}</p>` : ""}
-    </div>`;
-  }).join("");
+  $("#keySettings").innerHTML = fields.map(field => genericKeyFieldHtml(field, settings, configured, previews)).join("")
+    + scamalyticsFieldHtml(settings, configured, previews)
+    + genericKeyFieldHtml("abuseipdb_api_key", settings, configured, previews);
+  renderProviderGuide(settings);
   $$('[data-key-eye]').forEach(button => button.addEventListener("click", () => {
     const field = button.dataset.keyEye;
     const visible = button.classList.toggle("visible");
@@ -242,6 +303,27 @@ function renderSettings() {
     state.pendingKeyRemovals[field].add(button.dataset.removeId);
     button.closest(".saved-key").classList.add("pending-remove");
   }));
+  $("#addScamalyticsPair").addEventListener("click", () => {
+    $("#scamalyticsPairInputs").insertAdjacentHTML("beforeend", scamalyticsPairRowHtml());
+  });
+  $("#scamalyticsPairInputs").addEventListener("click", event => {
+    const eye = event.target.closest("[data-scamalytics-row-eye]");
+    if (eye) {
+      const row = eye.closest(".scamalytics-pair-row");
+      const visible = eye.getAttribute("aria-pressed") !== "true";
+      row.querySelectorAll("input").forEach(input => { input.type = visible ? "text" : "password"; });
+      eye.innerHTML = keyVisibilityIcon(visible);
+      eye.setAttribute("aria-pressed", String(visible));
+      eye.setAttribute("aria-label", visible ? "隐藏这一组凭据" : "显示这一组凭据");
+      return;
+    }
+    const remove = event.target.closest("[data-remove-scamalytics-row]");
+    if (remove) {
+      const rows = $$(".scamalytics-pair-row", $("#scamalyticsPairInputs"));
+      if (rows.length === 1) rows[0].querySelectorAll("input").forEach(input => { input.value = ""; });
+      else remove.closest(".scamalytics-pair-row").remove();
+    }
+  });
   $("#settingSingbox").value = settings.singbox_path || "";
   $("#settingXray").value = settings.xray_path || "";
   $("#settingHistoryLimit").value = settings.history_limit || 10;
@@ -259,6 +341,20 @@ async function saveSettings() {
       ? input.value.split(/[\r\n,;]+/).map(value => value.trim()).filter(Boolean)
       : input.value.trim();
   });
+  const scamalyticsCredentials = [];
+  let incompleteScamalyticsPair = false;
+  $$(".scamalytics-pair-row", $("#scamalyticsPairInputs")).forEach(row => {
+    const username = $("[data-scamalytics-username]", row).value.trim();
+    const apiKey = $("[data-scamalytics-key]", row).value.trim();
+    if (!username && !apiKey) return;
+    if (!username || !apiKey) incompleteScamalyticsPair = true;
+    else scamalyticsCredentials.push({username, api_key: apiKey});
+  });
+  if (incompleteScamalyticsPair) {
+    toast("Scamalytics 每一组都必须同时填写 Username 和 API Key", "error");
+    return;
+  }
+  if (scamalyticsCredentials.length) updates.scamalytics_credentials = scamalyticsCredentials;
   if (IS_LOCAL_UI && $("#settingSingbox").value.trim()) updates.singbox_path = $("#settingSingbox").value.trim();
   if (IS_LOCAL_UI && $("#settingXray").value.trim()) updates.xray_path = $("#settingXray").value.trim();
   updates.default_timeout = Number($("#timeout").value || 15);

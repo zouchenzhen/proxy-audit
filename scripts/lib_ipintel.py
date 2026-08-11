@@ -6,7 +6,14 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
-from lib_secrets import load_settings, normalize_secret_values, secret_id
+from lib_secrets import (
+    SCAMALYTICS_CREDENTIALS_FIELD,
+    decode_scamalytics_credential,
+    load_settings,
+    normalize_scamalytics_credentials,
+    normalize_secret_values,
+    secret_id,
+)
 
 
 PROVIDER_META = [
@@ -15,7 +22,7 @@ PROVIDER_META = [
     {"id": "ipinfo", "name": "IPinfo", "key_field": "ipinfo_api_key", "default": True},
     {"id": "ip2location", "name": "IP2Location", "key_field": "ip2location_api_key", "default": True},
     {"id": "ipqs", "name": "IPQualityScore", "key_field": "ipqs_api_key", "default": True},
-    {"id": "scamalytics", "name": "Scamalytics", "key_field": "scamalytics_api_key", "default": True},
+    {"id": "scamalytics", "name": "Scamalytics", "key_field": SCAMALYTICS_CREDENTIALS_FIELD, "default": True},
     {"id": "abuseipdb", "name": "AbuseIPDB", "key_field": "abuseipdb_api_key", "default": False},
 ]
 DEFAULT_PROVIDERS = [item["id"] for item in PROVIDER_META if item["default"]]
@@ -152,16 +159,28 @@ def fetch_ipqs(ip: str, timeout: int = 15, cfg=None) -> Dict[str, Any]:
 
 def fetch_scamalytics(ip: str, timeout: int = 15, cfg=None) -> Dict[str, Any]:
     cfg = load_local_config() if cfg is None else cfg
-    user = cfg.get("scamalytics_user")
     headers = {"Accept": "application/json,text/plain,*/*"}
     session = _session_with_socks()
-    if not user:
-        return _get_json(session, f"https://scamalytics.com/ip/{ip}?output=json", timeout, headers=headers)
+    credentials = normalize_scamalytics_credentials(cfg.get(SCAMALYTICS_CREDENTIALS_FIELD))
     return _request_with_key_pool(
-        "scamalytics_api_key",
-        cfg,
-        lambda key: _get_json(session, f"https://api11.scamalytics.com/v3/{user}/", timeout, headers=headers, params={"key": key, "ip": ip}),
+        SCAMALYTICS_CREDENTIALS_FIELD,
+        {SCAMALYTICS_CREDENTIALS_FIELD: credentials},
+        lambda encoded: _fetch_scamalytics_credential(session, encoded, ip, timeout, headers),
         fallback=lambda: _get_json(session, f"https://scamalytics.com/ip/{ip}?output=json", timeout, headers=headers),
+    )
+
+
+def _fetch_scamalytics_credential(session, encoded: str, ip: str, timeout: int, headers) -> Dict[str, Any]:
+    decoded = decode_scamalytics_credential(encoded)
+    if not decoded:
+        raise ProviderKeyUnavailable("invalid Scamalytics credential pair")
+    username, api_key = decoded
+    return _get_json(
+        session,
+        f"https://api11.scamalytics.com/v3/{username}/",
+        timeout,
+        headers=headers,
+        params={"key": api_key, "ip": ip},
     )
 
 

@@ -62,7 +62,7 @@
         </div>
         <label class="field-label">IP 情报源 <button class="text-button" id="selectDefaultProviders">恢复默认</button></label>
         <div class="provider-list" id="providerList"></div>
-        <p class="provider-legend">绿点表示已配置 Key；灰点不代表不可用。IP-API 无需 Key，ipapi.is 未填 Key 时使用匿名额度。</p>
+        <p class="provider-legend">绿点＝已保存凭据；蓝点＝无需 Key／官方匿名模式；灰点＝未保存凭据，可能降级或跳过。勾选框决定本次是否查询。</p>
         <details class="optional-block">
           <summary>可选网络探测 <span>默认精简</span></summary>
           <label class="switch-line"><input type="checkbox" id="qualityProbe" checked><i></i><span>延迟与抖动采样（2 次）</span></label>
@@ -168,7 +168,17 @@
     <section class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
       <header><div><span class="eyebrow" id="settingsEyebrow">LOCAL VAULT</span><h2 id="settingsTitle">本机设置</h2><p id="settingsSubtitle">Key 仅保存在本机；Windows 使用当前用户 DPAPI 加密。</p></div><button class="icon-button" data-close="settingsModal">×</button></header>
       <div class="modal-body">
-        <div class="settings-section"><h3>IP 情报服务商</h3><p class="settings-help" id="keyLimitHelp">IP-API 无需注册或 Key；IP-API 与 ipapi.is 是两个不同服务。其余服务商可加入多个授权 Key（每行一个，最多 50 个），鉴权失败或额度受限时自动切换下一枚。</p><div class="settings-grid" id="keySettings"></div></div>
+        <div class="settings-section">
+          <h3>IP 情报服务商</h3>
+          <p class="settings-help" id="keyLimitHelp">绿点只表示凭据已保存，不代表服务商刚刚验证成功或仍有额度；蓝点表示无需 Key 或使用官方匿名模式；灰点表示未保存凭据。普通 Key 每行一个，Scamalytics 按 Username + API Key 成组保存。</p>
+          <details class="provider-guide" open>
+            <summary>状态含义、单账户免费额度与限制</summary>
+            <div class="provider-guide-legend"><span><i class="configured"></i>已保存凭据</span><span><i class="anonymous"></i>免 Key／匿名</span><span><i class="missing"></i>未配置</span></div>
+            <div id="providerGuideList"></div>
+            <p>额度与条款可能调整，以各服务商官方页面为准；不要通过重复免费账户规避额度限制。</p>
+          </details>
+          <div class="settings-grid" id="keySettings"></div>
+        </div>
         <div class="settings-section local-copy"><h3>检测内核路径</h3>
           <label><span>sing-box.exe</span><input id="settingSingbox" placeholder="留空使用项目 bin/sing-box.exe"></label>
           <label><span>xray.exe</span><input id="settingXray" placeholder="留空自动发现 v2rayN 内核"></label>

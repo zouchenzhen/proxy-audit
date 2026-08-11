@@ -1,4 +1,5 @@
 import base64
+import binascii
 import ctypes
 import hashlib
 import json
@@ -12,12 +13,14 @@ from lib_paths import ROOT
 
 SECURE_CONFIG = ROOT / "config.secure.json"
 LEGACY_CONFIG = ROOT / "config.local.json"
+SCAMALYTICS_CREDENTIALS_FIELD = "scamalytics_credentials"
 SECRET_FIELDS = {
     "ipapi_is_api_key",
     "ip2location_api_key",
     "ipinfo_api_key",
     "ipqs_api_key",
     "scamalytics_api_key",
+    SCAMALYTICS_CREDENTIALS_FIELD,
     "abuseipdb_api_key",
 }
 ALLOWED_FIELDS = SECRET_FIELDS | {
@@ -38,7 +41,6 @@ ENV_SECRET_PREFIXES = {
     "abuseipdb_api_key": "PROXY_AUDIT_ABUSEIPDB_API_KEY",
 }
 ENV_PLAIN_FIELDS = {
-    "scamalytics_user": "PROXY_AUDIT_SCAMALYTICS_USER",
 }
 
 
@@ -136,6 +138,69 @@ def secret_preview(value: str) -> Dict[str, str]:
     }
 
 
+def encode_scamalytics_credential(username: str, api_key: str) -> str:
+    username = str(username or "").strip()
+    api_key = str(api_key or "").strip()
+    if not username or not api_key:
+        return ""
+    raw = json.dumps([username[:120], api_key[:4096]], ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def decode_scamalytics_credential(value: str):
+    try:
+        encoded = str(value or "").strip()
+        raw = base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4))
+        decoded = json.loads(raw.decode("utf-8"))
+        if not isinstance(decoded, list) or len(decoded) != 2:
+            return None
+        username, api_key = (str(part or "").strip() for part in decoded)
+        if not username or not api_key:
+            return None
+        return username[:120], api_key[:4096]
+    except (ValueError, TypeError, json.JSONDecodeError, binascii.Error):
+        return None
+
+
+def normalize_scamalytics_credentials(value: Any) -> List[str]:
+    values = value if isinstance(value, (list, tuple, set)) else [value]
+    output: List[str] = []
+    seen = set()
+    for item in values:
+        if isinstance(item, dict):
+            encoded = encode_scamalytics_credential(item.get("username"), item.get("api_key"))
+        else:
+            decoded = decode_scamalytics_credential(str(item or ""))
+            encoded = encode_scamalytics_credential(*decoded) if decoded else ""
+        if not encoded or encoded in seen:
+            continue
+        seen.add(encoded)
+        output.append(encoded)
+        if len(output) >= MAX_KEYS_PER_PROVIDER:
+            break
+    return output
+
+
+def normalize_secret_field(field: str, value: Any) -> List[str]:
+    if field == SCAMALYTICS_CREDENTIALS_FIELD:
+        return normalize_scamalytics_credentials(value)
+    return normalize_secret_values(value)
+
+
+def scamalytics_credential_previews(value: Any) -> List[Dict[str, str]]:
+    previews = []
+    for encoded in normalize_scamalytics_credentials(value):
+        username, api_key = decode_scamalytics_credential(encoded)
+        user_preview = secret_preview(username)
+        key_preview = secret_preview(api_key)
+        previews.append({
+            "id": secret_id(encoded),
+            "masked": "Username •••••••• / Key ••••••••",
+            "prefix": f"{user_preview['prefix']} / {key_preview['prefix']}",
+        })
+    return previews
+
+
 def _environment_settings() -> Dict[str, Any]:
     settings: Dict[str, Any] = {}
     for field, prefix in ENV_SECRET_PREFIXES.items():
@@ -149,6 +214,18 @@ def _environment_settings() -> Dict[str, Any]:
         value = str(os.environ.get(name) or "").strip()
         if value:
             settings[field] = value
+    scam_users: List[str] = []
+    user_prefix = "PROXY_AUDIT_SCAMALYTICS_USER"
+    for name in [user_prefix, f"{user_prefix}S", *(f"{user_prefix}_{index}" for index in range(1, MAX_KEYS_PER_PROVIDER + 1))]:
+        scam_users.extend(normalize_secret_values(os.environ.get(name)))
+    scam_users = normalize_secret_values(scam_users)
+    scam_keys = normalize_secret_values(settings.pop("scamalytics_api_key", []))
+    if scam_users and scam_keys:
+        if len(scam_users) == 1:
+            pairs = [(scam_users[0], key) for key in scam_keys]
+        else:
+            pairs = list(zip(scam_users, scam_keys))
+        settings[SCAMALYTICS_CREDENTIALS_FIELD] = [encode_scamalytics_credential(user, key) for user, key in pairs]
     return settings
 
 
@@ -168,7 +245,13 @@ def load_settings(include_legacy: bool = True, include_environment: bool = True)
     output = {key: value for key, value in settings.items() if key in ALLOWED_FIELDS}
     for field in SECRET_FIELDS:
         if field in output:
-            output[field] = normalize_secret_values(output[field])
+            output[field] = normalize_secret_field(field, output[field])
+    if not output.get(SCAMALYTICS_CREDENTIALS_FIELD):
+        legacy_users = normalize_secret_values(output.get("scamalytics_user"))
+        legacy_keys = normalize_secret_values(output.get("scamalytics_api_key"))
+        if legacy_users and legacy_keys:
+            pairs = [(legacy_users[0], key) for key in legacy_keys] if len(legacy_users) == 1 else list(zip(legacy_users, legacy_keys))
+            output[SCAMALYTICS_CREDENTIALS_FIELD] = [encode_scamalytics_credential(user, key) for user, key in pairs]
     return output
 
 
@@ -185,16 +268,26 @@ def save_settings(updates: Dict[str, Any], clear_fields=None, remove_key_ids=Non
         if field not in SECRET_FIELDS:
             continue
         remove = {str(identifier) for identifier in identifiers or []}
-        current[field] = [key for key in normalize_secret_values(current.get(field)) if secret_id(key) not in remove]
+        current[field] = [key for key in normalize_secret_field(field, current.get(field)) if secret_id(key) not in remove]
     for key, value in updates.items():
         if key not in ALLOWED_FIELDS or value is None or value == "":
             continue
         if key in SECRET_FIELDS:
-            current[key] = normalize_secret_values(normalize_secret_values(current.get(key)) + normalize_secret_values(value))
+            current[key] = normalize_secret_field(key, normalize_secret_field(key, current.get(key)) + normalize_secret_field(key, value))
             continue
         if key in {"default_timeout", "default_concurrency", "history_limit"}:
             value = int(value)
         current[key] = value
+
+    scam_changed = (
+        SCAMALYTICS_CREDENTIALS_FIELD in (clear_fields or [])
+        or SCAMALYTICS_CREDENTIALS_FIELD in (remove_key_ids or {})
+        or SCAMALYTICS_CREDENTIALS_FIELD in updates
+        or bool(current.get(SCAMALYTICS_CREDENTIALS_FIELD))
+    )
+    if scam_changed:
+        current.pop("scamalytics_user", None)
+        current.pop("scamalytics_api_key", None)
 
     raw = json.dumps(current, ensure_ascii=False).encode("utf-8")
     protected = os.name == "nt"
@@ -213,14 +306,18 @@ def save_settings(updates: Dict[str, Any], clear_fields=None, remove_key_ids=Non
 def public_settings() -> Dict[str, Any]:
     settings = load_settings()
     key_previews = {
-        field: [secret_preview(value) for value in normalize_secret_values(settings.get(field))]
+        field: (
+            scamalytics_credential_previews(settings.get(field))
+            if field == SCAMALYTICS_CREDENTIALS_FIELD
+            else [secret_preview(value) for value in normalize_secret_values(settings.get(field))]
+        )
         for field in sorted(SECRET_FIELDS)
     }
     return {
         "configured": {field: bool(key_previews[field]) for field in sorted(SECRET_FIELDS)},
         "key_counts": {field: len(key_previews[field]) for field in sorted(SECRET_FIELDS)},
         "key_previews": key_previews,
-        "scamalytics_user_configured": bool(settings.get("scamalytics_user")),
+        "scamalytics_user_configured": bool(key_previews.get(SCAMALYTICS_CREDENTIALS_FIELD)),
         "singbox_path": settings.get("singbox_path") or "",
         "xray_path": settings.get("xray_path") or "",
         "default_timeout": int(settings.get("default_timeout") or 15),

@@ -20,7 +20,15 @@ from lib_cloud_security import fetch_public_subscription, pin_public_node
 from lib_ipintel import DEFAULT_PROVIDERS, PROVIDER_META, SERVICE_TARGETS
 from lib_kernels import kernel_catalog
 from lib_paths import WEB_DIR
-from lib_secrets import SECRET_FIELDS, normalize_secret_values, secret_id, secret_preview
+from lib_secrets import (
+    SCAMALYTICS_CREDENTIALS_FIELD,
+    SECRET_FIELDS,
+    normalize_secret_field,
+    normalize_secret_values,
+    scamalytics_credential_previews,
+    secret_id,
+    secret_preview,
+)
 from lib_tasks import TaskManager
 from lib_v2rayn import load_from_input_file, load_from_text, load_from_v2ray_backup, load_from_v2ray_db
 
@@ -50,14 +58,18 @@ def _now() -> float:
 
 def _public_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
     previews = {
-        field_name: [secret_preview(value) for value in normalize_secret_values(settings.get(field_name))]
+        field_name: (
+            scamalytics_credential_previews(settings.get(field_name))
+            if field_name == SCAMALYTICS_CREDENTIALS_FIELD
+            else [secret_preview(value) for value in normalize_secret_values(settings.get(field_name))]
+        )
         for field_name in sorted(SECRET_FIELDS)
     }
     return {
         "configured": {field_name: bool(previews[field_name]) for field_name in previews},
         "key_counts": {field_name: len(previews[field_name]) for field_name in previews},
         "key_previews": previews,
-        "scamalytics_user_configured": bool(settings.get("scamalytics_user")),
+        "scamalytics_user_configured": bool(previews.get(SCAMALYTICS_CREDENTIALS_FIELD)),
         "singbox_path": "",
         "xray_path": "",
         "default_timeout": max(4, min(int(settings.get("default_timeout") or 15), 30)),
@@ -78,15 +90,11 @@ def _update_settings(settings: Dict[str, Any], payload: Dict[str, Any]) -> None:
         remove = {str(value) for value in remove_ids.get(field_name) or []}
         if remove:
             settings[field_name] = [
-                key for key in normalize_secret_values(settings.get(field_name)) if secret_id(key) not in remove
+                key for key in normalize_secret_field(field_name, settings.get(field_name)) if secret_id(key) not in remove
             ]
         if field_name in updates:
-            merged = normalize_secret_values(settings.get(field_name)) + normalize_secret_values(updates[field_name])
-            settings[field_name] = normalize_secret_values(merged)[:MAX_KEYS_PER_PROVIDER]
-    if "scamalytics_user" in clear_fields:
-        settings["scamalytics_user"] = ""
-    if str(updates.get("scamalytics_user") or "").strip():
-        settings["scamalytics_user"] = str(updates["scamalytics_user"]).strip()[:120]
+            merged = normalize_secret_field(field_name, settings.get(field_name)) + normalize_secret_field(field_name, updates[field_name])
+            settings[field_name] = normalize_secret_field(field_name, merged)[:MAX_KEYS_PER_PROVIDER]
     if "default_timeout" in updates:
         settings["default_timeout"] = max(4, min(int(updates["default_timeout"]), 30))
     if "default_concurrency" in updates:

@@ -252,8 +252,10 @@ cd proxy-audit
   "ip2location_api_key": ["key-1", "key-2"],
   "ipinfo_api_key": ["key-1", "key-2"],
   "ipqs_api_key": ["key-1", "key-2"],
-  "scamalytics_user": "...",
-  "scamalytics_api_key": ["key-1", "key-2"],
+  "scamalytics_credentials": [
+    {"username": "account-1", "api_key": "key-1"},
+    {"username": "account-2", "api_key": "key-2"}
+  ],
   "abuseipdb_api_key": ["key-1", "key-2"]
 }
 ```
@@ -261,7 +263,8 @@ cd proxy-audit
 `IP-API` 免费端点不需要注册或 Key。`ipapi.is` 与它不是同一家服务；
 `ipapi.is` Key 是可选项，不填写时仍使用匿名免费额度，注册用户可将账户首页
 `API Credentials` 中的 Key 填入设置面板。Scamalytics 的 Username 与 API Key
-由服务商受理申请后通过邮件提供；已经显示“已配置”或绿色状态时无需重复填写。
+由服务商受理申请后通过邮件提供；设置面板会将多组 Username + API Key 配对保存和轮换，
+不会把不同账户的用户名与 Key 交叉组合。旧版单用户名配置会自动兼容迁移。
 
 作用：
 - 为多源 IP 画像提供正式 API key

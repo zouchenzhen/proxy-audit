@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import cloud_app
 import lib_tasks
 from lib_cloud_security import pin_public_node, resolve_public_host
+from lib_secrets import decode_scamalytics_credential
 from lib_tasks import TaskManager, safe_node
 from lib_v2rayn import extract_backup_and_get_db
 
@@ -70,6 +71,28 @@ class CloudApiTests(unittest.TestCase):
         self.import_public(first)
         self.assertEqual(len(self.client.get("/api/imports", headers=self.headers(first)).get_json()["imports"]), 1)
         self.assertEqual(self.client.get("/api/imports", headers=self.headers(second)).get_json()["imports"], [])
+
+    def test_scamalytics_pairs_are_saved_together_without_api_echo(self):
+        token = self.session()
+        pairs = [
+            {"username": "cloud-scam-user-one", "api_key": "cloud-scam-key-one"},
+            {"username": "cloud-scam-user-two", "api_key": "cloud-scam-key-two"},
+        ]
+        saved = self.client.put(
+            "/api/settings",
+            headers=self.headers(token),
+            json={"updates": {"scamalytics_credentials": pairs}},
+        )
+        self.assertEqual(saved.status_code, 200)
+        public = saved.get_json()
+        self.assertEqual(public["key_counts"]["scamalytics_credentials"], 2)
+        self.assertNotIn("cloud-scam-user-one", saved.get_data(as_text=True))
+        self.assertNotIn("cloud-scam-key-one", saved.get_data(as_text=True))
+        stored = self.store.get(token).settings["scamalytics_credentials"]
+        self.assertEqual([decode_scamalytics_credential(value) for value in stored], [
+            ("cloud-scam-user-one", "cloud-scam-key-one"),
+            ("cloud-scam-user-two", "cloud-scam-key-two"),
+        ])
 
     def test_huggingface_origin_is_allowed_and_unrelated_origin_is_denied(self):
         token = self.session()

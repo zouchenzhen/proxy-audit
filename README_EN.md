@@ -105,7 +105,8 @@ IP-API's free endpoint requires neither registration nor a key. IP-API and ipapi
 providers: an ipapi.is key is optional, and the anonymous free tier remains available when it is
 left blank. Registered users can copy the key shown under `API Credentials` into the settings
 panel. Scamalytics sends the API username, key, documentation, and access details after reviewing
-the registration request.
+the registration request. Multiple Scamalytics credentials are stored and rotated as explicit
+Username + API Key pairs so credentials from different accounts are never mixed.
 
 ## Tests
 

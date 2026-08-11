@@ -5,6 +5,8 @@
 - 新增 1Password CLI `op run` 运行时 Key 注入；支持多 Key 环境变量且不会写回本地 DPAPI 配置
 - 新增可选的 ipapi.is 注册 Key 配置、轮换与 1Password 注入；未配置时继续使用匿名免费查询
 - 设置面板补充 IP-API、ipapi.is、Scamalytics 与 AbuseIPDB 的凭据来源提示
+- Scamalytics 改为多组 Username + API Key 成对加密保存、显示、移除和轮换，并兼容旧配置迁移
+- 设置内新增三色状态图例、各服务商单账户免费额度、限制与官方说明链接
 
 ## 2026-08-10
 

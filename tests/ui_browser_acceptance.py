@@ -219,7 +219,7 @@ def main():
         assert geometry["cardOverflow"] <= 1, geometry
         assert geometry["dockOverlap"] <= 1, geometry
         assert geometry["railScrollable"], geometry
-        assert cdp.evaluate("document.querySelector('.provider-legend').textContent.includes('灰点不代表不可用')")
+        assert cdp.evaluate("document.querySelector('.provider-legend').textContent.includes('蓝点＝无需 Key')")
 
         cdp.evaluate("document.querySelector('#settingsButton').click()")
         wait_for(lambda: cdp.evaluate("!document.querySelector('#settingsModal').classList.contains('hidden')"), message="settings modal")
@@ -241,6 +241,10 @@ def main():
               keyEyePressed: document.querySelector('[data-key-eye]').getAttribute('aria-pressed'),
               ipapiKeyField: Boolean(document.querySelector('[data-setting="ipapi_is_api_key"]')),
               credentialHelp: document.querySelector('#keySettings').textContent.includes('API Credentials'),
+              providerGuideRows: document.querySelectorAll('.provider-guide-row').length,
+              providerGuideHasAllStates: ['configured','anonymous','missing'].every(name => document.querySelector(`.provider-guide-legend .${name}`)),
+              scamalyticsPairRows: document.querySelectorAll('.scamalytics-pair-row').length,
+              scamalyticsSavedPairs: document.querySelectorAll('[data-key-list="scamalytics_credentials"] .saved-key').length,
               footerButtonSizes: [...document.querySelectorAll('.settings-modal footer button')].map(button => {
                 const rect = button.getBoundingClientRect();
                 return {width: rect.width, height: rect.height};
@@ -251,11 +255,15 @@ def main():
         assert modal["bodyLocked"], modal
         assert modal["viewportFit"], modal
         assert modal["fieldOverflow"] == 0, modal
-        assert modal["keyPoolInputs"] == 6, modal
+        assert modal["keyPoolInputs"] == 5, modal
         assert modal["keyEyes"] == 6, modal
         assert modal["keyEyeSvgs"] == 6, modal
         assert modal["ipapiKeyField"], modal
         assert modal["credentialHelp"], modal
+        assert modal["providerGuideRows"] == 7, modal
+        assert modal["providerGuideHasAllStates"], modal
+        assert modal["scamalyticsPairRows"] == 1, modal
+        assert modal["scamalyticsSavedPairs"] >= 1, modal
         assert modal["keyEyePressed"] == "false", modal
         assert len(modal["footerButtonSizes"]) == 2, modal
         assert abs(modal["footerButtonSizes"][0]["width"] - modal["footerButtonSizes"][1]["width"]) <= 1, modal
@@ -265,6 +273,31 @@ def main():
         assert cdp.evaluate("document.querySelector('[data-key-eye]').getAttribute('aria-pressed')") == "true"
         assert cdp.evaluate("document.querySelector('[data-key-eye] svg.key-eye-icon') !== null")
         assert cdp.evaluate("document.querySelector('[data-key-eye]').getAttribute('aria-label')") == "隐藏 Key 短前缀"
+        cdp.evaluate("document.querySelector('#addScamalyticsPair').click()")
+        assert cdp.evaluate("document.querySelectorAll('.scamalytics-pair-row').length") == 2
+        cdp.evaluate("document.querySelector('.scamalytics-pair-row [data-scamalytics-row-eye]').click()")
+        assert cdp.evaluate("document.querySelector('.scamalytics-pair-row [data-scamalytics-username]').type") == "text"
+        cdp.evaluate("document.querySelector('.provider-guide').open = false; document.querySelector('.scamalytics-pair-field').scrollIntoView({block:'center'})")
+        pair_layout = cdp.evaluate("""
+          (() => {
+            const modal = document.querySelector('.settings-modal').getBoundingClientRect();
+            const field = document.querySelector('.scamalytics-pair-field').getBoundingClientRect();
+            const rows = [...document.querySelectorAll('.scamalytics-pair-row')].map(row => {
+              const rect = row.getBoundingClientRect();
+              const children = [...row.children].map(child => child.getBoundingClientRect());
+              return {
+                width: rect.width,
+                childOverflow: children.filter(child => child.left < rect.left || child.right > rect.right).length,
+                overlap: children.slice(1).some((child, index) => child.left < children[index].right - 1),
+              };
+            });
+            return {fieldInsideModal: field.left >= modal.left && field.right <= modal.right, rows};
+          })()
+        """)
+        assert pair_layout["fieldInsideModal"], pair_layout
+        assert all(row["childOverflow"] == 0 and not row["overlap"] for row in pair_layout["rows"]), pair_layout
+        pair_screenshot = Path(args.screenshot).with_name(Path(args.screenshot).stem + "-scamalytics-pairs" + Path(args.screenshot).suffix)
+        cdp.screenshot(pair_screenshot)
         cdp.screenshot(Path(args.screenshot))
         cdp.evaluate("document.querySelector('[data-close=" + json.dumps("settingsModal") + "]').click()")
         wait_for(lambda: cdp.evaluate("document.querySelector('#settingsModal').classList.contains('hidden')"), message="settings close")
@@ -378,6 +411,7 @@ socks://demo-jp.invalid:1080#Demo-JP-Node-02`;
             "viewport": f"{args.width}x{args.height}",
             "geometry": geometry,
             "settingsModal": modal,
+            "scamalyticsPairLayout": pair_layout,
             "uiImport": "passed",
             "importPreviewRestore": "passed",
             "uiTask": "passed",
@@ -391,6 +425,7 @@ socks://demo-jp.invalid:1080#Demo-JP-Node-02`;
             "legalPage": "passed",
             "javascriptExceptions": 0,
             "screenshot": str(Path(args.screenshot)),
+            "scamalyticsPairScreenshot": str(pair_screenshot),
             "previewScreenshot": str(preview_screenshot),
             "complianceScreenshot": str(compliance_screenshot),
             "lightScreenshot": str(light_screenshot),

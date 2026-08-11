@@ -83,6 +83,49 @@ class SecureSettingsTests(unittest.TestCase):
         self.assertEqual(authenticated, {"q": "8.8.8.8", "key": "registered-key"})
         self.assertEqual(anonymous, {"q": "1.1.1.1"})
 
+    def test_scamalytics_credentials_are_paired_migrated_and_redacted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            secure = Path(directory) / "config.secure.json"
+            legacy = Path(directory) / "config.local.json"
+            legacy.write_text(json.dumps({
+                "scamalytics_user": "legacy-scam-user",
+                "scamalytics_api_key": ["legacy-scam-key-one", "legacy-scam-key-two"],
+            }), encoding="utf-8")
+            with patch.object(lib_secrets, "SECURE_CONFIG", secure), patch.object(lib_secrets, "LEGACY_CONFIG", legacy):
+                loaded = lib_secrets.load_settings()
+                pairs = [lib_secrets.decode_scamalytics_credential(value) for value in loaded["scamalytics_credentials"]]
+                self.assertEqual(pairs, [
+                    ("legacy-scam-user", "legacy-scam-key-one"),
+                    ("legacy-scam-user", "legacy-scam-key-two"),
+                ])
+                public = lib_secrets.public_settings()
+                serialized = json.dumps(public)
+                self.assertNotIn("legacy-scam-user", serialized)
+                self.assertNotIn("legacy-scam-key-one", serialized)
+                first_id = public["key_previews"]["scamalytics_credentials"][0]["id"]
+                lib_secrets.save_settings({}, remove_key_ids={"scamalytics_credentials": [first_id]})
+                remaining = lib_secrets.load_settings(include_legacy=False)["scamalytics_credentials"]
+                self.assertEqual([lib_secrets.decode_scamalytics_credential(value) for value in remaining], [
+                    ("legacy-scam-user", "legacy-scam-key-two"),
+                ])
+
+    def test_scamalytics_request_keeps_each_username_with_its_key(self):
+        credentials = [
+            lib_secrets.encode_scamalytics_credential("pair-user-one", "pair-key-one"),
+            lib_secrets.encode_scamalytics_credential("pair-user-two", "pair-key-two"),
+        ]
+        with lib_ipintel._KEY_POOL_LOCK:
+            lib_ipintel._KEY_POOL_CURSOR.pop("scamalytics_credentials", None)
+            lib_ipintel._KEY_POOL_COOLDOWN.clear()
+
+        def fake_get_json(session, url, timeout, headers=None, params=None):
+            return {"url": url, "params": dict(params or {})}
+
+        with patch.object(lib_ipintel, "_get_json", side_effect=fake_get_json):
+            result = lib_ipintel.fetch_scamalytics("8.8.8.8", cfg={"scamalytics_credentials": credentials})
+        self.assertIn("/pair-user-one/", result["url"])
+        self.assertEqual(result["params"]["key"], "pair-key-one")
+
     def test_history_limit_is_bounded_and_public(self):
         with tempfile.TemporaryDirectory() as directory:
             secure = Path(directory) / "config.secure.json"
@@ -100,21 +143,25 @@ class SecureSettingsTests(unittest.TestCase):
                 "PROXY_AUDIT_IPAPI_IS_API_KEY_1": "runtime-ipapi-is",
                 "PROXY_AUDIT_IPINFO_API_KEY_1": "runtime-one",
                 "PROXY_AUDIT_IPINFO_API_KEY_2": "runtime-two",
-                "PROXY_AUDIT_SCAMALYTICS_USER": "runtime-user",
+                "PROXY_AUDIT_SCAMALYTICS_USER_1": "runtime-user",
+                "PROXY_AUDIT_SCAMALYTICS_API_KEY_1": "runtime-scam-key",
             }
             with patch.object(lib_secrets, "SECURE_CONFIG", secure), patch.object(lib_secrets, "LEGACY_CONFIG", legacy):
                 with patch.dict(os.environ, runtime, clear=False):
                     loaded = lib_secrets.load_settings()
                     self.assertEqual(loaded["ipapi_is_api_key"], ["runtime-ipapi-is"])
                     self.assertEqual(loaded["ipinfo_api_key"], ["runtime-one", "runtime-two"])
-                    self.assertEqual(loaded["scamalytics_user"], "runtime-user")
+                    self.assertEqual(
+                        [lib_secrets.decode_scamalytics_credential(value) for value in loaded["scamalytics_credentials"]],
+                        [("runtime-user", "runtime-scam-key")],
+                    )
                     lib_secrets.save_settings({"history_limit": 22})
                 persisted = lib_secrets.load_settings(include_legacy=False)
                 self.assertEqual(persisted["ipinfo_api_key"], ["legacy-secret"])
                 self.assertNotIn("runtime-one", persisted["ipinfo_api_key"])
                 self.assertNotIn("runtime-two", persisted["ipinfo_api_key"])
                 self.assertNotIn("ipapi_is_api_key", persisted)
-                self.assertNotIn("scamalytics_user", persisted)
+                self.assertNotIn("scamalytics_credentials", persisted)
                 self.assertEqual(persisted["history_limit"], 22)
 
 
