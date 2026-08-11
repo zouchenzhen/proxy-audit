@@ -109,6 +109,11 @@ cd proxy-audit
 - `config.local.json` 是旧版明文配置兼容入口。确认新设置已经保存后，建议手动删除旧文件。
 - `input/`、`results/`、`temp/`、本地配置和内核二进制均已加入 `.gitignore`。
 
+可选使用 1Password CLI 做纯运行时注入：复制 `config.1password.example.env` 为
+`.1password/proxy-audit.env`，将占位符替换为对应 `op://` 引用，然后运行
+`./start-web-1password.ps1`。Profile 只保存引用，Key 仅存在于目标进程环境；通过界面保存
+其他设置时，运行时 Key 不会被复制进 `config.secure.json`。
+
 ### 安装依赖
 
 启动脚本会检查依赖。也可以手动安装：

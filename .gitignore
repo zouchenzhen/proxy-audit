@@ -6,6 +6,7 @@ config.tmp
 .env
 .env.*
 !.env.example
+.1password/
 
 # Node sources, databases, generated configs, logs, and reports
 input/

@@ -28,6 +28,16 @@ ALLOWED_FIELDS = SECRET_FIELDS | {
     "history_limit",
 }
 MAX_KEYS_PER_PROVIDER = 50
+ENV_SECRET_PREFIXES = {
+    "ip2location_api_key": "PROXY_AUDIT_IP2LOCATION_API_KEY",
+    "ipinfo_api_key": "PROXY_AUDIT_IPINFO_API_KEY",
+    "ipqs_api_key": "PROXY_AUDIT_IPQS_API_KEY",
+    "scamalytics_api_key": "PROXY_AUDIT_SCAMALYTICS_API_KEY",
+    "abuseipdb_api_key": "PROXY_AUDIT_ABUSEIPDB_API_KEY",
+}
+ENV_PLAIN_FIELDS = {
+    "scamalytics_user": "PROXY_AUDIT_SCAMALYTICS_USER",
+}
 
 
 class DATA_BLOB(ctypes.Structure):
@@ -124,7 +134,23 @@ def secret_preview(value: str) -> Dict[str, str]:
     }
 
 
-def load_settings(include_legacy: bool = True) -> Dict[str, Any]:
+def _environment_settings() -> Dict[str, Any]:
+    settings: Dict[str, Any] = {}
+    for field, prefix in ENV_SECRET_PREFIXES.items():
+        values: List[str] = []
+        for name in [prefix, f"{prefix}S", *(f"{prefix}_{index}" for index in range(1, MAX_KEYS_PER_PROVIDER + 1))]:
+            values.extend(normalize_secret_values(os.environ.get(name)))
+        values = normalize_secret_values(values)
+        if values:
+            settings[field] = values
+    for field, name in ENV_PLAIN_FIELDS.items():
+        value = str(os.environ.get(name) or "").strip()
+        if value:
+            settings[field] = value
+    return settings
+
+
+def load_settings(include_legacy: bool = True, include_environment: bool = True) -> Dict[str, Any]:
     settings: Dict[str, Any] = {}
     if include_legacy and LEGACY_CONFIG.exists():
         try:
@@ -135,6 +161,8 @@ def load_settings(include_legacy: bool = True) -> Dict[str, Any]:
         settings.update(_read_secure())
     except (OSError, ValueError, RuntimeError):
         pass
+    if include_environment:
+        settings.update(_environment_settings())
     output = {key: value for key, value in settings.items() if key in ALLOWED_FIELDS}
     for field in SECRET_FIELDS:
         if field in output:
@@ -143,7 +171,9 @@ def load_settings(include_legacy: bool = True) -> Dict[str, Any]:
 
 
 def save_settings(updates: Dict[str, Any], clear_fields=None, remove_key_ids=None) -> Dict[str, Any]:
-    current = load_settings()
+    # Runtime-injected values must stay process-only and must never be copied
+    # into config.secure.json when another setting is saved through the UI.
+    current = load_settings(include_environment=False)
     for key in clear_fields or []:
         if key in ALLOWED_FIELDS:
             # Keep an explicit empty tombstone so a cleared value does not

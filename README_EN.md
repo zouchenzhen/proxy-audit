@@ -96,6 +96,11 @@ All screenshots below were generated in an isolated acceptance environment with 
 
 See [Privacy](PRIVACY.md), [Security Policy](SECURITY.md), and [Responsible Use](COMPLIANCE.md) for details. Never publish real subscriptions, node credentials, API keys, or identifiable result data in issues, pull requests, logs, or screenshots.
 
+For optional process-only injection with 1Password CLI, copy `config.1password.example.env` to
+`.1password/proxy-audit.env`, replace the placeholders with `op://` references, and run
+`./start-web-1password.ps1`. The profile stores references only. Runtime keys are not copied into
+`config.secure.json` when other settings are saved through the UI.
+
 ## Tests
 
 ```powershell

@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 2026-08-11
+
+- 新增 1Password CLI `op run` 运行时 Key 注入；支持多 Key 环境变量且不会写回本地 DPAPI 配置
+
 ## 2026-08-10
 
 ### Web UI 2.3 · Hugging Face 临时云端版

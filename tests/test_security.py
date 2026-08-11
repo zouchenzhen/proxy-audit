@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -76,6 +77,29 @@ class SecureSettingsTests(unittest.TestCase):
             with patch.object(lib_secrets, "SECURE_CONFIG", secure), patch.object(lib_secrets, "LEGACY_CONFIG", legacy):
                 lib_secrets.save_settings({"history_limit": 37})
                 self.assertEqual(lib_secrets.public_settings()["history_limit"], 37)
+
+    def test_runtime_environment_keys_override_without_being_persisted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            secure = Path(directory) / "config.secure.json"
+            legacy = Path(directory) / "config.local.json"
+            legacy.write_text(json.dumps({"ipinfo_api_key": "legacy-secret"}), encoding="utf-8")
+            runtime = {
+                "PROXY_AUDIT_IPINFO_API_KEY_1": "runtime-one",
+                "PROXY_AUDIT_IPINFO_API_KEY_2": "runtime-two",
+                "PROXY_AUDIT_SCAMALYTICS_USER": "runtime-user",
+            }
+            with patch.object(lib_secrets, "SECURE_CONFIG", secure), patch.object(lib_secrets, "LEGACY_CONFIG", legacy):
+                with patch.dict(os.environ, runtime, clear=False):
+                    loaded = lib_secrets.load_settings()
+                    self.assertEqual(loaded["ipinfo_api_key"], ["runtime-one", "runtime-two"])
+                    self.assertEqual(loaded["scamalytics_user"], "runtime-user")
+                    lib_secrets.save_settings({"history_limit": 22})
+                persisted = lib_secrets.load_settings(include_legacy=False)
+                self.assertEqual(persisted["ipinfo_api_key"], ["legacy-secret"])
+                self.assertNotIn("runtime-one", persisted["ipinfo_api_key"])
+                self.assertNotIn("runtime-two", persisted["ipinfo_api_key"])
+                self.assertNotIn("scamalytics_user", persisted)
+                self.assertEqual(persisted["history_limit"], 22)
 
 
 class ResultRedactionTests(unittest.TestCase):
