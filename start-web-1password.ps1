@@ -18,10 +18,10 @@ if (-not $opPath) {
     $opPath = $opCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 }
 if (-not $opPath) {
-    throw '未找到 1Password CLI（op）。请先安装并启用桌面端 CLI 集成。'
+    throw '1Password CLI (op) was not found. Install it and enable desktop CLI integration first.'
 }
 if (-not (Test-Path -LiteralPath $ProfilePath)) {
-    throw "未找到 1Password Profile：$ProfilePath。请复制 config.1password.example.env 后填写 op:// 引用。"
+    throw "1Password profile not found: $ProfilePath. Copy config.1password.example.env and add op:// references."
 }
 
 $childArgs = @(

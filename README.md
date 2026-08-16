@@ -112,7 +112,9 @@ cd proxy-audit
 可选使用 1Password CLI 做纯运行时注入：复制 `config.1password.example.env` 为
 `.1password/proxy-audit.env`，将占位符替换为对应 `op://` 引用，然后运行
 `./start-web-1password.ps1`。Profile 只保存引用，Key 仅存在于目标进程环境；通过界面保存
-其他设置时，运行时 Key 不会被复制进 `config.secure.json`。
+其他设置时，运行时 Key 不会被复制进 `config.secure.json`。同一服务商的多枚 Key 使用
+连续的 `_1`、`_2`、`_3` 环境变量；Scamalytics 的 Username 与 API Key 必须使用相同编号，
+以确保每组凭据始终配对。
 
 ### 安装依赖
 

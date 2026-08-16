@@ -11,27 +11,27 @@ Set-Location -LiteralPath $projectRoot
 
 $venvPython = Join-Path $projectRoot '.venv\Scripts\python.exe'
 if (-not (Test-Path -LiteralPath $venvPython)) {
-    Write-Host '[Proxy Audit] 正在创建隔离 Python 环境…' -ForegroundColor Cyan
+    Write-Host '[Proxy Audit] Creating an isolated Python environment...' -ForegroundColor Cyan
     $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
     if ($pyLauncher) {
         & $pyLauncher.Source -3 -m venv (Join-Path $projectRoot '.venv')
     } else {
         $python = Get-Command python -ErrorAction SilentlyContinue
         if (-not $python) {
-            throw '未找到 Python 3。请先安装 Python 3.10+，安装时勾选 Add Python to PATH。'
+            throw 'Python 3 was not found. Install Python 3.10+ and add it to PATH.'
         }
         & $python.Source -m venv (Join-Path $projectRoot '.venv')
     }
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $venvPython)) {
-        throw '创建 .venv 失败，请确认 Python 3.10+ 已正确安装并包含 venv 模块。'
+        throw 'Failed to create .venv. Verify that Python 3.10+ and the venv module are installed.'
     }
 }
 
 & $venvPython -c "import flask, requests, socks" 2>$null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host '[Proxy Audit] 正在安装 Python 依赖…' -ForegroundColor Cyan
+    Write-Host '[Proxy Audit] Installing Python dependencies...' -ForegroundColor Cyan
     & $venvPython -m pip install -r (Join-Path $projectRoot 'requirements.txt')
-    if ($LASTEXITCODE -ne 0) { throw 'Python 依赖安装失败，请检查网络后重试。' }
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to install Python dependencies. Check the network connection and retry.' }
 }
 
 $singBox = Join-Path $projectRoot 'bin\sing-box.exe'
@@ -42,21 +42,21 @@ if (-not $SkipCoreDownload -and -not (Test-Path -LiteralPath $singBox)) {
     $archive = Join-Path $downloadRoot 'sing-box.zip'
     $extractRoot = Join-Path $downloadRoot 'extract'
     New-Item -ItemType Directory -Force -Path $downloadRoot, $extractRoot, (Split-Path -Parent $singBox) | Out-Null
-    Write-Host '[Proxy Audit] 正在从官方发行页下载 sing-box…' -ForegroundColor Cyan
+    Write-Host '[Proxy Audit] Downloading sing-box from the official release...' -ForegroundColor Cyan
     Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/SagerNet/sing-box/releases/download/v$version/sing-box-$version-windows-amd64.zip" -OutFile $archive
     $actualSha256 = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
     if ($actualSha256 -ne $expectedSha256) {
-        throw "sing-box 下载校验失败。实际 SHA256：$actualSha256"
+        throw "sing-box checksum verification failed. Actual SHA256: $actualSha256"
     }
     Expand-Archive -LiteralPath $archive -DestinationPath $extractRoot -Force
     $downloadedBinary = Get-ChildItem -LiteralPath $extractRoot -Recurse -Filter 'sing-box.exe' -File | Select-Object -First 1
     if (-not $downloadedBinary) {
-        throw 'sing-box 压缩包中未找到 sing-box.exe。'
+        throw 'sing-box.exe was not found in the downloaded archive.'
     }
     Copy-Item -LiteralPath $downloadedBinary.FullName -Destination $singBox -Force
 }
 
 $webArguments = @('scripts/web_app.py', '--port', $Port)
 if ($NoOpen) { $webArguments += '--no-open' }
-Write-Host "[Proxy Audit] 启动本地面板：http://127.0.0.1:$Port" -ForegroundColor Green
+Write-Host "[Proxy Audit] Starting local panel: http://127.0.0.1:$Port" -ForegroundColor Green
 & $venvPython @webArguments

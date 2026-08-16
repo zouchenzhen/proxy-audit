@@ -285,5 +285,15 @@ class ResultRedactionTests(unittest.TestCase):
             self.assertEqual(len(list(raw.glob("*.json"))), 3)
 
 
+class PowerShellLauncherCompatibilityTests(unittest.TestCase):
+    def test_windows_powershell_launchers_are_ascii_or_utf8_bom(self):
+        for name in ("start-web.ps1", "start-web-1password.ps1"):
+            data = (ROOT / name).read_bytes()
+            self.assertTrue(
+                data.startswith(b"\xef\xbb\xbf") or data.isascii(),
+                f"{name} must be ASCII or include a UTF-8 BOM for Windows PowerShell 5",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

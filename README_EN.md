@@ -99,7 +99,9 @@ See [Privacy](PRIVACY.md), [Security Policy](SECURITY.md), and [Responsible Use]
 For optional process-only injection with 1Password CLI, copy `config.1password.example.env` to
 `.1password/proxy-audit.env`, replace the placeholders with `op://` references, and run
 `./start-web-1password.ps1`. The profile stores references only. Runtime keys are not copied into
-`config.secure.json` when other settings are saved through the UI.
+`config.secure.json` when other settings are saved through the UI. Use consecutive `_1`, `_2`,
+and `_3` environment-variable suffixes for multiple keys from the same provider. Scamalytics
+usernames and API keys must use matching suffixes so each credential pair stays together.
 
 IP-API's free endpoint requires neither registration nor a key. IP-API and ipapi.is are separate
 providers: an ipapi.is key is optional, and the anonymous free tier remains available when it is

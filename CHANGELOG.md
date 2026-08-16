@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 2026-08-16
+
+- 1Password 示例补充多 Key 的连续编号规则，以及 Scamalytics Username + API Key 同编号配对要求
+- 修复无 BOM UTF-8 PowerShell 启动脚本在 Windows PowerShell 5 本地代码页下的解析失败
+
 ## 2026-08-11
 
 - 新增 1Password CLI `op run` 运行时 Key 注入；支持多 Key 环境变量且不会写回本地 DPAPI 配置
