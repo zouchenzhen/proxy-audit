@@ -12,15 +12,15 @@ Windows 11 下的代理节点批量检测工具。目标是从 v2rayN 备份 / �
 
 治理与发布文档：[Security Policy](SECURITY.md) · [第三方许可](THIRD_PARTY_NOTICES.md) · [品牌使用](TRADEMARKS.md) · [公开发布检查清单](docs/PUBLIC_RELEASE_CHECKLIST.md) · [Apache-2.0](LICENSE)
 
-## 在线演示（即将开放）
+## 在线演示
 
-在线地址（暂未开放）：[https://zouchenzhen-zcz.hf.space](https://zouchenzhen-zcz.hf.space)
+在线使用：[https://zouchenzhen-zcz.hf.space](https://zouchenzhen-zcz.hf.space)
 
-> [!NOTE]
-> 我正在开发一个无需安装、打开浏览器即可使用的在线演示版。完成稳定性和隐私验收后，
-> 我会在这里更新开放状态；现在请先使用下方本地版。
+> [!WARNING]
+> 在线版无需安装，但会把完成检测所需的数据上传到 Hugging Face Space 的临时后端。
+> 高敏感、大批量或需要持久历史的场景请使用下方本地版。
 
-在线演示版开放后，页面和检测后端将位于同一个临时云端环境。同意隐私提示后，每个浏览器
+在线演示的页面和检测后端位于同一个临时云端环境。同意隐私提示后，每个浏览器
 标签页会创建一个匿名临时会话，节点、订阅、API Key、任务和结果会上传到临时后端处理。
 
 - 数据只保存在单进程内存和任务期临时文件，不写入数据库或项目历史；会话最长一小时；
@@ -31,8 +31,7 @@ Windows 11 下的代理节点批量检测工具。目标是从 v2rayN 备份 / �
 - Hugging Face、订阅服务器、IP 情报商和测试端点仍会处理完成请求所必需的数据。高敏感、
   大批量或需要持久历史的场景请使用下方本地版。
 
-完整边界见[隐私说明](PRIVACY.md)。在线演示正式开放前，这些规则仍可能根据实际验收结果
-调整；开放时会同步更新文档。云端镜像分发的固定版本内核许可证与对应源码归档将通过
+完整边界见[隐私说明](PRIVACY.md)。云端镜像分发的固定版本内核许可证与对应源码归档通过
 在线站点的 `/third-party/` 路径提供。
 
 IPinfo、IP2Location、IPQualityScore、Scamalytics、AbuseIPDB 等服务的 Key 可在各自官网

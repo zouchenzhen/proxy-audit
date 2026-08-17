@@ -5,20 +5,20 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![Security and tests](https://github.com/zouchenzhen/proxy-audit/actions/workflows/security-and-tests.yml/badge.svg)](https://github.com/zouchenzhen/proxy-audit/actions/workflows/security-and-tests.yml)
 
-Proxy Audit is a Web UI for batch-testing proxy node connectivity and exit-IP quality. Its localhost Windows edition is available now, and a browser-ready Hugging Face demo is in preparation. It imports v2rayN backups, databases, subscriptions, and share links; runs real outbound checks through sing-box or Xray; enriches exit IPs with multiple intelligence providers; and presents searchable, filterable results.
+Proxy Audit is a Web UI for batch-testing proxy node connectivity and exit-IP quality. It provides both a localhost Windows edition and a browser-ready Hugging Face demo. It imports v2rayN backups, databases, subscriptions, and share links; runs real outbound checks through sing-box or Xray; enriches exit IPs with multiple intelligence providers; and presents searchable, filterable results.
 
 > [!IMPORTANT]
 > Test only assets that you own, manage, or have explicit permission to test. Follow applicable local laws and third-party service terms. Proxy Audit is not a node provider and does not offer a public proxy service, access-control bypass, or anonymity guarantee.
 
-## Online demo (coming soon)
+## Online demo
 
-Online address (not open yet): [https://zouchenzhen-zcz.hf.space](https://zouchenzhen-zcz.hf.space)
+Open online: [https://zouchenzhen-zcz.hf.space](https://zouchenzhen-zcz.hf.space)
 
-> [!NOTE]
-> I am developing a browser-ready demo that will require no local installation. I will update its
-> availability here after stability and privacy validation; use the local edition in the meantime.
+> [!WARNING]
+> The online edition requires no installation, but it uploads the data needed for each audit to a
+> temporary Hugging Face Space backend. Use the local edition for sensitive, large, or persistent work.
 
-The online demo will run its page and audit backend in the same ephemeral cloud environment. After
+The online demo runs its page and audit backend in the same ephemeral cloud environment. After
 explicit consent, each browser tab will receive an anonymous temporary session and upload nodes,
 subscriptions, API keys, tasks, and results to that temporary backend.
 
@@ -30,8 +30,7 @@ subscriptions, API keys, tasks, and results to that temporary backend.
 - Hugging Face and the selected subscription/intelligence/probe services still process data required
   for the request. Use the local edition for sensitive, large, or persistent workloads.
 
-Before the demo opens, these rules may be adjusted based on validation results and the documentation
-will be updated accordingly. The deployed site will expose upstream licenses and corresponding-source
+The deployed site exposes upstream licenses and corresponding-source
 archives for the pinned sing-box and Xray builds under `/third-party/`.
 
 API keys can be registered on each provider's official website. Free plans are generally sufficient

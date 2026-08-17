@@ -20,6 +20,11 @@ short_description: 临时会话的节点连通性与出口 IP 质量检测面板
 导出结果。高敏感、大批量或需要持久历史的场景请使用
 [GitHub 仓库](https://github.com/zouchenzhen/proxy-audit)中的本地版。
 
+Proxy Audit 不为在线版建立用户数据库、结果历史或开发者遥测接口，也不嵌入第三方分析
+SDK。会话令牌只保存在当前浏览器标签页的 `sessionStorage`。Hugging Face 仍会处理托管
+服务所需的常规访问元数据；订阅服务器、IP 情报商和测试端点会收到完成所选请求所必需的
+数据。具体边界以页面首次打开时的隐私提示为准。
+
 镜像内固定分发的第三方许可与对应版本源码归档可从运行中的 Space 获取：
 
 - `/third-party/licenses/sing-box-LICENSE`
