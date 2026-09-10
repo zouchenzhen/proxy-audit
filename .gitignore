@@ -12,6 +12,7 @@ config.tmp
 input/
 results/
 temp/
+logs/
 *.db
 *.sqlite
 *.sqlite3

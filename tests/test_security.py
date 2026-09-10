@@ -287,7 +287,7 @@ class ResultRedactionTests(unittest.TestCase):
 
 class PowerShellLauncherCompatibilityTests(unittest.TestCase):
     def test_windows_powershell_launchers_are_ascii_or_utf8_bom(self):
-        for name in ("start-web.ps1", "start-web-1password.ps1"):
+        for name in ("start-web.ps1", "start-web-1password.ps1", "scripts/start_web_runtime.ps1"):
             data = (ROOT / name).read_bytes()
             self.assertTrue(
                 data.startswith(b"\xef\xbb\xbf") or data.isascii(),

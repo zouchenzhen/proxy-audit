@@ -39,7 +39,7 @@ do not require a key can also be used directly.
 
 ## Local edition quick start
 
-Windows 11 and Python 3.10+ are recommended.
+Use Windows with **Python 3.10+ installed** (enable **Add python.exe to PATH** in the installer). Windows 11 is recommended. If you use GitHub's Download ZIP, **extract the entire archive into a writable directory** before double-clicking `start-web.cmd`; do not run it inside the ZIP.
 
 ```powershell
 git clone https://github.com/zouchenzhen/proxy-audit.git
@@ -48,6 +48,17 @@ cd proxy-audit
 ```
 
 The launcher creates a virtual environment, installs Python dependencies, and downloads a pinned sing-box release with SHA256 verification when no supported core is found. The browser then opens `http://127.0.0.1:8765`. The server listens on localhost only.
+
+On failure, the double-click window keeps the error visible until you press a key. Each launch saves
+console output to `logs/startup-*.log`, falling back to the Windows temporary directory when the
+project directory is not writable. The exact path is printed in the window. Logs stay local and are
+excluded from Git and Docker; review them for local paths, subscription URLs, or other sensitive
+information before sharing an error excerpt.
+
+The launcher reports missing/old Python, installation/download errors, and occupied ports. Use
+`.\start-web.cmd -Port 8766` to select another port. Automated callers can set
+`PROXY_AUDIT_NO_PAUSE=1` to disable the failure pause; failures still return a nonzero exit code.
+Direct `start-web.ps1` runs also save logs and return failure codes, without a pause.
 
 You can also start it from PowerShell:
 

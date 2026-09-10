@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 2026-09-11
+
+- Windows 双击启动失败后保留窗口，保存启动日志并显示路径；不可写目录回退到系统临时目录
+- 修复 Windows PowerShell 5.1 将依赖导入的标准错误当作终止异常、导致首次自动安装被跳过的问题
+- 启动前检查 Python 3.10+、项目完整性和端口可用性，补充安装/下载失败提示与非零退出码
+- CMD 入口支持参数转发及 `PROXY_AUDIT_NO_PAUSE=1` 自动化模式；日志排除在 Git 和 Docker 外
+
 ## 2026-08-16
 
 - 1Password 示例补充多 Key 的连续编号规则，以及 Scamalytics Username + API Key 同编号配对要求

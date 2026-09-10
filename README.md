@@ -40,7 +40,7 @@ IPinfo、IP2Location、IPQualityScore、Scamalytics、AbuseIPDB 等服务的 Key
 
 ## 本地 Web UI（高敏感/大批量推荐）
 
-克隆后双击项目根目录的 `start-web.cmd` 即可。首次启动会自动创建 `.venv`、安装 Python 依赖，并在缺少检测内核时从 sing-box 官方发行页下载经过 SHA256 校验的固定版本：
+先安装 **Python 3.10 或更新版本**，安装时勾选 **Add python.exe to PATH**。克隆项目，或将 GitHub 下载的 ZIP **完整解压到可写目录**后，双击项目根目录的 `start-web.cmd`；不要直接在压缩包里运行。首次启动会自动创建 `.venv`、安装 Python 依赖，并在缺少检测内核时从 sing-box 官方发行页下载经过 SHA256 校验的固定版本：
 
 ```powershell
 git clone https://github.com/zouchenzhen/proxy-audit.git
@@ -56,6 +56,16 @@ cd proxy-audit
 ```
 
 浏览器会打开 `http://127.0.0.1:8765`。面板只监听本机，不对局域网或公网开放。
+
+**启动失败时**，双击窗口会保留错误信息，按任意键后才关闭。每次启动的终端输出会保存到
+`logs/startup-*.log`；项目目录不可写时回退到 Windows 临时目录，窗口会显示具体路径。
+日志仅保存在本机，不会自动上传，也不会提交到 Git 或打包进 Docker。反馈问题时可提供
+最后的错误段落，分享前检查是否含有本机路径、订阅地址或其他敏感信息。
+
+- 缺少 Python、Python 版本过旧、依赖安装失败、内核下载失败和端口占用都会给出具体提示。
+- 端口被占用时可运行 `.\start-web.cmd -Port 8766`；命令行参数会传给 PowerShell 启动脚本。
+- 自动化调用可设置环境变量 `PROXY_AUDIT_NO_PAUSE=1` 禁用失败暂停；退出码仍为非零。
+- 直接运行 `start-web.ps1` 也会保存日志并返回失败退出码；双击入口请使用 `start-web.cmd`。
 
 计划中的在线演示版与本地版共用主要界面功能；本地版另提供加密持久 Key、最多一万节点导入和最近
 任务历史。Web UI 现已支持：

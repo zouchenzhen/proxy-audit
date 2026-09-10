@@ -10,6 +10,7 @@ input
 pages-dist
 results
 temp
+logs
 tests
 config.local.json
 config.secure.json

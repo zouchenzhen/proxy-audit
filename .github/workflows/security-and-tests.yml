@@ -34,9 +34,11 @@ jobs:
           python -m compileall -q scripts tests
           python scripts/build_pages.py
           node --check web/app.js
-          $errors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'start-web.ps1'), [ref]$null, [ref]$errors) | Out-Null
-          if ($errors.Count) { $errors | Format-List | Out-String | Write-Error }
+          foreach ($file in @('start-web.ps1', 'start-web-1password.ps1', 'scripts/start_web_runtime.ps1')) {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$null, [ref]$errors) | Out-Null
+            if ($errors.Count) { $errors | Format-List | Out-String | Write-Error }
+          }
 
       - name: Scan full Git history for sensitive material
         run: python scripts/scan_git_history.py
